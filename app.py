@@ -66,8 +66,8 @@ def get_gemini_model(api_key: str):
         )
     try:
         genai.configure(api_key=key_to_use)
-        # Usamos gemini-1.5-flash para velocidad y consistencia
-        return genai.GenerativeModel("gemini-1.5-flash")
+        # Usamos gemini-2.5-flash para velocidad y consistencia en el año 2026
+        return genai.GenerativeModel("gemini-2.5-flash")
     except Exception as e:
         logger.error(f"Error al configurar la API de Gemini: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error de configuración de IA: {str(e)}")
