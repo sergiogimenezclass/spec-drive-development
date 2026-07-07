@@ -23,7 +23,8 @@ const state = {
     questionTree: [],
     activeQuestionIndex: 0,
     isDarkTheme: true,
-    hasBackendApiKey: false
+    hasBackendApiKey: false,
+    generationPath: 'guided'
 };
 
 // Estructura fija de los 16 archivos de la spec
@@ -193,6 +194,23 @@ function setupEventListeners() {
         });
     });
 
+    // Selección de Metodología (Camino 1 vs Camino 2)
+    const pathOptions = document.querySelectorAll('.path-option');
+    pathOptions.forEach(opt => {
+        opt.addEventListener('click', () => {
+            pathOptions.forEach(o => o.classList.remove('active'));
+            opt.classList.add('active');
+            state.generationPath = opt.dataset.path;
+            
+            const startBtnText = document.querySelector('#start-discovery-btn span');
+            if (state.generationPath === 'direct') {
+                startBtnText.innerText = "Generar Specs Directamente";
+            } else {
+                startBtnText.innerText = "Iniciar Descubrimiento con Gemini";
+            }
+        });
+    });
+
     // Iniciar Descubrimiento
     document.getElementById('start-discovery-btn').addEventListener('click', () => {
         startDiscoveryFlow();
@@ -352,41 +370,101 @@ async function startDiscoveryFlow() {
     showScreen('screen-discovery');
     document.getElementById('discovery-loader').classList.remove('hidden');
     document.getElementById('wizard-container').classList.add('hidden');
-    document.getElementById('loader-status-text').innerText = "Gemini está analizando la idea...";
     
-    try {
-        const response = await fetch('/api/analyze-idea', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Gemini-Key': state.apiKey
-            },
-            body: JSON.stringify({ idea: seedIdea })
-        });
+    if (state.generationPath === 'direct') {
+        document.getElementById('loader-status-text').innerText = "Gemini está analizando conceptualmente tu idea...";
         
-        const data = await response.json();
+        try {
+            // 1. Obtener metadatos básicos
+            const response = await fetch('/api/analyze-idea', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Gemini-Key': state.apiKey
+                },
+                body: JSON.stringify({ idea: seedIdea })
+            });
+            
+            const data = await response.json();
+            state.currentProject.metadata.domain = data.domain || 'Por definir';
+            state.currentProject.metadata.productType = data.productType || 'SaaS';
+            state.currentProject.metadata.actors = data.actors || [];
+            state.currentProject.metadata.features = data.detectedFeatures || [];
+            
+            // Actualizar panel lateral conceptual
+            updateConceptualAnalysisPanel();
+            
+            // 2. Generar directamente las especificaciones con la IA
+            document.getElementById('loader-status-text').innerText = "Generando los 16 archivos de especificación en formato Markdown... (Esto puede tardar unos segundos)";
+            
+            await saveProjectToServer(); // Guardar el proyecto en su estado inicial
+            
+            const exportResponse = await fetch('/api/export-specs', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Gemini-Key': state.apiKey
+                },
+                body: JSON.stringify({ project_data: state.currentProject })
+            });
+            
+            const exportData = await exportResponse.json();
+            if (exportData.status === 'success') {
+                // Cargar el proyecto con todos los specModules cargados
+                const loadResp = await fetch('/api/load-project');
+                const loadData = await loadResp.json();
+                
+                if (loadData.status === 'success' && loadData.project) {
+                    state.currentProject = loadData.project;
+                }
+                showToast("Especificaciones generadas directamente con éxito", "success");
+                loadWorkspace();
+            } else {
+                throw new Error("La generación de especificaciones no devolvió éxito.");
+            }
+        } catch (e) {
+            console.error(e);
+            showToast("Error en la generación directa. Redirigiendo a pantalla de inicio.", "error");
+            showScreen('screen-dashboard');
+        }
+    } else {
+        // Camino 2: Entrevista Guiada
+        document.getElementById('loader-status-text').innerText = "Gemini está formulando preguntas inteligentes para tu proyecto...";
         
-        // Cargar árbol de preguntas dinámicas y metadatos
-        state.questionTree = data.questions || [];
-        state.currentProject.metadata.domain = data.domain || 'Por definir';
-        state.currentProject.metadata.productType = data.productType || 'SaaS';
-        state.currentProject.metadata.actors = data.actors || [];
-        state.currentProject.metadata.features = data.detectedFeatures || [];
-        
-        // Actualizar UI del panel lateral conceptual
-        updateConceptualAnalysisPanel();
-        
-        // Iniciar Wizard
-        state.activeQuestionIndex = 0;
-        document.getElementById('discovery-loader').classList.add('hidden');
-        document.getElementById('wizard-container').classList.remove('hidden');
-        renderWizardQuestion();
-        
-    } catch (e) {
-        console.error(e);
-        showToast("Error de conexión con la IA. Se cargaron preguntas de fallback.", "error");
-        document.getElementById('discovery-loader').classList.add('hidden');
-        document.getElementById('wizard-container').classList.remove('hidden');
+        try {
+            const response = await fetch('/api/analyze-idea', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Gemini-Key': state.apiKey
+                },
+                body: JSON.stringify({ idea: seedIdea })
+            });
+            
+            const data = await response.json();
+            
+            // Cargar árbol de preguntas dinámicas y metadatos
+            state.questionTree = data.questions || [];
+            state.currentProject.metadata.domain = data.domain || 'Por definir';
+            state.currentProject.metadata.productType = data.productType || 'SaaS';
+            state.currentProject.metadata.actors = data.actors || [];
+            state.currentProject.metadata.features = data.detectedFeatures || [];
+            
+            // Actualizar UI del panel lateral conceptual
+            updateConceptualAnalysisPanel();
+            
+            // Iniciar Wizard
+            state.activeQuestionIndex = 0;
+            document.getElementById('discovery-loader').classList.add('hidden');
+            document.getElementById('wizard-container').classList.remove('hidden');
+            renderWizardQuestion();
+            
+        } catch (e) {
+            console.error(e);
+            showToast("Error de conexión con la IA. Se cargaron preguntas de fallback.", "error");
+            document.getElementById('discovery-loader').classList.add('hidden');
+            document.getElementById('wizard-container').classList.remove('hidden');
+        }
     }
 }
 

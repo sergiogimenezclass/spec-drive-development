@@ -103,6 +103,25 @@
                                     <div class="preset-chip" data-preset="ia">IA Agent / RAG Tool</div>
                                 </div>
                             </div>
+                            <div class="form-group">
+                                <label>Metodología de Generación</label>
+                                <div class="path-selection-grid">
+                                    <div class="path-option active" data-path="guided" id="path-guided">
+                                        <div class="path-option-icon"><i class="fa-solid fa-comments"></i></div>
+                                        <div class="path-option-info">
+                                            <span class="path-title">Entrevista Guiada (Camino 2)</span>
+                                            <span class="path-desc">Gemini te formulará preguntas progresivas para refinar especificaciones y requisitos.</span>
+                                        </div>
+                                    </div>
+                                    <div class="path-option" data-path="direct" id="path-direct">
+                                        <div class="path-option-icon"><i class="fa-solid fa-bolt"></i></div>
+                                        <div class="path-option-info">
+                                            <span class="path-title">Generación Directa (Camino 1)</span>
+                                            <span class="path-desc">Omitir preguntas. La IA generará los 16 módulos de especificaciones directamente.</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                             <button id="start-discovery-btn" class="btn btn-primary btn-full-width">
                                 <span>Iniciar Descubrimiento con Gemini</span>
                                 <i class="fa-solid fa-arrow-right"></i>

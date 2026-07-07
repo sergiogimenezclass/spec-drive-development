@@ -285,6 +285,17 @@ async def load_project():
         logger.error(f"Error al cargar el proyecto: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+def clean_markdown(text: str) -> str:
+    text = text.strip()
+    if text.startswith("```"):
+        lines = text.split("\n")
+        if lines[0].startswith("```markdown") or lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines[-1].strip() == "```":
+            lines = lines[:-1]
+        text = "\n".join(lines).strip()
+    return text
+
 @app.post("/api/export-specs")
 async def export_specs(req: SaveProjectRequest, x_gemini_key: str = Header(None)):
     model = get_gemini_model(x_gemini_key)
@@ -294,12 +305,12 @@ async def export_specs(req: SaveProjectRequest, x_gemini_key: str = Header(None)
         os.makedirs(SPECS_DIR)
         
     project = req.project_data
+    if "specModules" not in project:
+        project["specModules"] = {}
+        
     answers = project.get("answers", {})
     metadata = project.get("metadata", {})
     idea = project.get("seedIdea", "")
-    
-    # Vamos a pedirle a Gemini que genere los contenidos de los archivos Markdown más críticos
-    # Para ahorrar llamadas a la API, creamos plantillas base y rellenamos algunas con IA
     
     # Definimos la lista de archivos a generar
     files_to_generate = [
@@ -310,36 +321,96 @@ async def export_specs(req: SaveProjectRequest, x_gemini_key: str = Header(None)
     ]
     
     generated_files = []
-    
-    # Hacemos una llamada grupal para obtener el esqueleto Markdown de los módulos principales
-    prompt = f"""
-    Eres un Staff Software Architect. Basándote en la idea: "{idea}" y las siguientes respuestas detalladas:
-    {json.dumps(answers, ensure_ascii=False)}
-    
-    Genera el contenido en formato Markdown estructurado para los siguientes 4 archivos principales de especificaciones:
-    1. product.md (Visión, Objetivos, Usuarios y Casos de uso)
-    2. architecture.md (Pila tecnológica, Decisiones y Estructura)
-    3. database.md (Entidades, Atributos y relaciones)
-    4. api.md (Endpoints principales, autenticación y errores)
-    
-    Devuelve la información estructurada en el siguiente formato JSON estricto (no uses markdown en tu respuesta, solo el JSON):
-    {{
-        "product.md": "Contenido completo en Markdown...",
-        "architecture.md": "Contenido completo en Markdown...",
-        "database.md": "Contenido completo en Markdown...",
-        "api.md": "Contenido completo en Markdown..."
-    }}
-    """
-    
     ai_markdowns = {}
+    
+    # 1. Generar product.md
     try:
-        response = model.generate_content(
-            prompt,
-            generation_config={"response_mime_type": "application/json"}
-        )
-        ai_markdowns = json.loads(response.text)
+        prod_prompt = f"""
+        Eres un Staff Software Architect y Product Designer.
+        Genera el contenido completo en formato Markdown para el archivo 'product.md'.
+        Debe incluir:
+        1. Visión General del Producto
+        2. Objetivos de Negocio y Métricas de Éxito
+        3. Usuarios, Actores y sus Roles detallados
+        4. Casos de Uso principales e Historias clave
+        
+        Basándote en la idea del proyecto: "{idea}"
+        y las respuestas recopiladas: {json.dumps(answers, ensure_ascii=False)}
+        y metadatos: {json.dumps(metadata, ensure_ascii=False)}
+        
+        Devuelve únicamente el contenido Markdown listo para ser guardado. No utilices bloques de código Markdown (como ```markdown) para envolver tu respuesta.
+        """
+        logger.info("Generando product.md por IA...")
+        resp = model.generate_content(prod_prompt)
+        ai_markdowns["product.md"] = clean_markdown(resp.text)
     except Exception as e:
-        logger.error(f"Error generando contenido por IA para specs: {str(e)}")
+        logger.error(f"Error generando product.md por IA: {str(e)}")
+
+    # 2. architecture.md
+    try:
+        arch_prompt = f"""
+        Eres un Arquitecto de Software experto.
+        Genera el contenido completo en formato Markdown para el archivo 'architecture.md'.
+        Debe incluir:
+        1. Pila Tecnológica Propuesta (Frontend, Backend, Base de Datos, Servidor) y su justificación.
+        2. Decisiones de Diseño Clave e Infraestructura (Conceptos de despliegue).
+        3. Estructura de Módulos del Sistema y Flujo de Datos.
+        
+        Basándote en la idea del proyecto: "{idea}"
+        y las respuestas recopiladas: {json.dumps(answers, ensure_ascii=False)}
+        y metadatos: {json.dumps(metadata, ensure_ascii=False)}
+        
+        Devuelve únicamente el contenido Markdown listo para ser guardado. No utilices bloques de código Markdown (como ```markdown) para envolver tu respuesta.
+        """
+        logger.info("Generando architecture.md por IA...")
+        resp = model.generate_content(arch_prompt)
+        ai_markdowns["architecture.md"] = clean_markdown(resp.text)
+    except Exception as e:
+        logger.error(f"Error generando architecture.md por IA: {str(e)}")
+
+    # 3. database.md
+    try:
+        db_prompt = f"""
+        Eres un Ingeniero de Base de Datos experto.
+        Genera el contenido completo en formato Markdown para el archivo 'database.md'.
+        Debe incluir:
+        1. Diseño Conceptual del Modelo de Datos.
+        2. Listado de Entidades principales con sus atributos (tipos de datos) y relaciones.
+        3. Índices, restricciones o consideraciones de rendimiento.
+        
+        Basándote en la idea del proyecto: "{idea}"
+        y las respuestas recopiladas: {json.dumps(answers, ensure_ascii=False)}
+        y metadatos: {json.dumps(metadata, ensure_ascii=False)}
+        
+        Devuelve únicamente el contenido Markdown listo para ser guardado. No utilices bloques de código Markdown (como ```markdown) para envolver tu respuesta.
+        """
+        logger.info("Generando database.md por IA...")
+        resp = model.generate_content(db_prompt)
+        ai_markdowns["database.md"] = clean_markdown(resp.text)
+    except Exception as e:
+        logger.error(f"Error generando database.md por IA: {str(e)}")
+
+    # 4. api.md
+    try:
+        api_prompt = f"""
+        Eres un Diseñador de APIs RESTful experto.
+        Genera el contenido completo en formato Markdown para el archivo 'api.md'.
+        Debe incluir:
+        1. Protocolo de Comunicación, Autenticación y Manejo de Sesiones.
+        2. Listado de Endpoints clave (Rutas, Métodos HTTP, Payloads de petición y respuesta esperados).
+        3. Estructura de errores comunes.
+        
+        Basándote en la idea del proyecto: "{idea}"
+        y las respuestas recopiladas: {json.dumps(answers, ensure_ascii=False)}
+        y metadatos: {json.dumps(metadata, ensure_ascii=False)}
+        
+        Devuelve únicamente el contenido Markdown listo para ser guardado. No utilices bloques de código Markdown (como ```markdown) para envolver tu respuesta.
+        """
+        logger.info("Generando api.md por IA...")
+        resp = model.generate_content(api_prompt)
+        ai_markdowns["api.md"] = clean_markdown(resp.text)
+    except Exception as e:
+        logger.error(f"Error generando api.md por IA: {str(e)}")
         
     # Plantillas de fallback para los archivos
     for filename in files_to_generate:
@@ -353,134 +424,134 @@ async def export_specs(req: SaveProjectRequest, x_gemini_key: str = Header(None)
             # Fallback o generación basada en reglas
             if filename == "project.md":
                 content = f"""# Ficha Técnica del Proyecto: {project.get('name', 'Proyecto Spec-First')}
-
-## Información General
-*   **Idea Semilla:** {idea}
-*   **Dominio:** {metadata.get('domain', 'No especificado')}
-*   **Tipo de Producto:** {metadata.get('productType', 'No especificado')}
-*   **Actores Detectados:** {", ".join(metadata.get('actors', []))}
-
-## Resumen de Respuestas clave
-{chr(10).join([f"*   **{k}:** {v}" for k, v in answers.items()])}
-
----
-*Documento generado automáticamente por [Spec IDE](file://{os.path.abspath(__file__)}).*
-"""
+ 
+ ## Información General
+ *   **Idea Semilla:** {idea}
+ *   **Dominio:** {metadata.get('domain', 'No especificado')}
+ *   **Tipo de Producto:** {metadata.get('productType', 'No especificado')}
+ *   **Actores Detectados:** {", ".join(metadata.get('actors', []))}
+ 
+ ## Resumen de Respuestas clave
+ {chr(10).join([f"*   **{k}:** {v}" for k, v in answers.items()])}
+ 
+ ---
+ *Documento generado automáticamente por [Spec IDE](file://{os.path.abspath(__file__)}).*
+ """
             elif filename == "requirements.md":
                 content = f"""# Requisitos Funcionales y No Funcionales
-
-## Requisitos Funcionales (RF)
-A partir de la idea: *{idea}*
-*   **RF-01 (Autenticación):** El sistema debe permitir a los actores ({", ".join(metadata.get('actors', []))}) iniciar sesión de forma segura.
-*   **RF-02 (Core):** El sistema debe resolver la problemática central: "{idea}".
-*   **RF-03 (Administración):** Se debe proveer un panel de control para gestionar recursos.
-
-## Requisitos No Funcionales (RNF)
-*   **RNF-01 (Seguridad):** Cifrado de datos en tránsito (TLS/HTTPS).
-*   **RNF-02 (Rendimiento):** Tiempos de respuesta del backend inferiores a 300ms para endpoints CRUD.
-*   **RNF-03 (Usabilidad):** Interfaz fluida y accesible que cumpla con los estándares WCAG 2.1 AA.
-"""
+ 
+ ## Requisitos Funcionales (RF)
+ A partir de la idea: *{idea}*
+ *   **RF-01 (Autenticación):** El sistema debe permitir a los actores ({", ".join(metadata.get('actors', []))}) iniciar sesión de forma segura.
+ *   **RF-02 (Core):** El sistema debe resolver la problemática central: "{idea}".
+ *   **RF-03 (Administración):** Se debe proveer un panel de control para gestionar recursos.
+ 
+ ## Requisitos No Funcionales (RNF)
+ *   **RNF-01 (Seguridad):** Cifrado de datos en tránsito (TLS/HTTPS).
+ *   **RNF-02 (Rendimiento):** Tiempos de respuesta del backend inferiores a 300ms para endpoints CRUD.
+ *   **RNF-03 (Usabilidad):** Interfaz fluida y accesible que cumpla con los estándares WCAG 2.1 AA.
+ """
             elif filename == "user-stories.md":
                 content = f"""# Historias de Usuario (Specs)
-
-## Historia 1: Acceso al Sistema
-**Como** {metadata.get('actors', ['Usuario'])[0]}  
-**Quiero** ingresar con mis credenciales al sistema  
-**Para** poder acceder a mis recursos privados.
-
-*   **Criterio de Aceptación 1:** Dado un usuario no registrado, cuando intenta ingresar, el sistema debe mostrar un error de credenciales.
-*   **Criterio de Aceptación 2:** Dado un usuario registrado, cuando ingresa credenciales válidas, es redirigido al panel de control.
-
-## Historia 2: Ejecución del Core
-**Como** {metadata.get('actors', ['Usuario'])[0]}  
-**Quiero** interactuar con la funcionalidad principal del software  
-**Para** resolver mi necesidad de negocio.
-"""
+ 
+ ## Historia 1: Acceso al Sistema
+ **Como** {metadata.get('actors', ['Usuario'])[0]}  
+ **Quiero** ingresar con mis credenciales al sistema  
+ **Para** poder acceder a mis recursos privados.
+ 
+ *   **Criterio de Aceptación 1:** Dado un usuario no registrado, cuando intenta ingresar, el sistema debe mostrar un error de credenciales.
+ *   **Criterio de Aceptación 2:** Dado un usuario registrado, cuando ingresa credenciales válidas, es redirigido al panel de control.
+ 
+ ## Historia 2: Ejecución del Core
+ **Como** {metadata.get('actors', ['Usuario'])[0]}  
+ **Quiero** interactuar con la funcionalidad principal del software  
+ **Para** resolver mi necesidad de negocio.
+ """
             elif filename == "frontend.md":
                 content = f"""# Especificación Frontend
-
-## Vistas del Sistema
-1.  **Vista de Autenticación (Login):** Formulario limpio y accesible.
-2.  **Dashboard Principal:** Vista de datos generales y accesos rápidos.
-3.  **Detalle del Core:** Interfaz para interactuar con la lógica principal.
-
-## Estándares de Estilo
-*   **Tema:** Soporte de tema oscuro/claro.
-*   **Alineación:** Diseño fluido y mobile-first.
-"""
+ 
+ ## Vistas del Sistema
+ 1.  **Vista de Autenticación (Login):** Formulario limpio y accesible.
+ 2.  **Dashboard Principal:** Vista de datos generales y accesos rápidos.
+ 3.  **Detalle del Core:** Interfaz para interactuar con la lógica principal.
+ 
+ ## Estándares de Estilo
+ *   **Tema:** Soporte de tema oscuro/claro.
+ *   **Alineación:** Diseño fluido y mobile-first.
+ """
             elif filename == "backend.md":
                 content = f"""# Especificación Backend
-
-## Componentes y Servicios
-*   **Servicio de API REST:** Procesa las solicitudes del frontend.
-*   **Módulo de Base de Datos:** Capa de acceso a datos (ORM o consultas optimizadas).
-*   **Capa de Autenticación:** Validación de tokens JWT / Sesiones.
-"""
+ 
+ ## Componentes y Servicios
+ *   **Servicio de API REST:** Procesa las solicitudes del frontend.
+ *   **Módulo de Base de Datos:** Capa de acceso a datos (ORM o consultas optimizadas).
+ *   **Capa de Autenticación:** Validación de tokens JWT / Sesiones.
+ """
             elif filename == "security.md":
                 content = f"""# Políticas de Seguridad y Roles
-
-## Matriz de Control de Acceso (RBAC)
-*   **Roles:** {", ".join(metadata.get('actors', ['Usuario']))}
-*   **Políticas:**
-    *   Cada rol tiene permisos limitados a sus propios recursos.
-    *   Los administradores pueden gestionar todos los recursos.
-"""
+ 
+ ## Matriz de Control de Acceso (RBAC)
+ *   **Roles:** {", ".join(metadata.get('actors', ['Usuario']))}
+ *   **Políticas:**
+     *   Cada rol tiene permisos limitados a sus propios recursos.
+     *   Los administradores pueden gestionar todos los recursos.
+ """
             elif filename == "integrations.md":
                 content = f"""# Integraciones con Servicios de Terceros
-
-## Servicios Identificados
-*   **IA / LLM:** Google Gemini API (para flujos asistidos).
-*   **Otros servicios:** A definir en las fases de desarrollo avanzadas.
-"""
+ 
+ ## Servicios Identificados
+ *   **IA / LLM:** Google Gemini API (para flujos asistidos).
+ *   **Otros servicios:** A definir en las fases de desarrollo avanzadas.
+ """
             elif filename == "roadmap.md":
                 content = f"""# Planificación de Fases y Roadmap
-
-## Fase 1: Producto Mínimo Viable (MVP)
-*   Implementación del núcleo de la idea: "{idea}"
-*   Autenticación básica de usuarios.
-
-## Fase 2: Robustez y Escalabilidad (V1)
-*   Integraciones avanzadas de seguridad y analíticas.
-*   Optimización de base de datos.
-"""
+ 
+ ## Fase 1: Producto Mínimo Viable (MVP)
+ *   Implementación del núcleo de la idea: "{idea}"
+ *   Autenticación básica de usuarios.
+ 
+ ## Fase 2: Robustez y Escalabilidad (V1)
+ *   Integraciones avanzadas de seguridad y analíticas.
+ *   Optimización de base de datos.
+ """
             elif filename == "tasks.md":
                 content = f"""# Lista de Tareas de Desarrollo (TODOs)
-
-- [ ] **Configurar Base de Datos** e infraestructura inicial.
-- [ ] **Implementar Autenticación** y manejo de sesiones.
-- [ ] **Desarrollar el Flujo Principal** para: *{idea}*.
-- [ ] **Realizar Pruebas de Integración** y QA.
-"""
+ 
+ - [ ] **Configurar Base de Datos** e infraestructura inicial.
+ - [ ] **Implementar Autenticación** y manejo de sesiones.
+ - [ ] **Desarrollar el Flujo Principal** para: *{idea}*.
+ - [ ] **Realizar Pruebas de Integración** y QA.
+ """
             elif filename == "decisions.md":
                 content = f"""# Registro de Decisiones de Arquitectura (ADR)
-
-## ADR-01: Uso de API de Gemini para Refinamiento
-*   **Estatus:** Aceptado
-*   **Contexto:** Necesitamos un descubrimiento inteligente de requisitos.
-*   **Decisión:** Integrar Gemini para generar preguntas condicionales y pre-escribir las specs.
-*   **Consecuencias:** Mayor velocidad de diseño y consistencia técnica inicial.
-"""
+ 
+ ## ADR-01: Uso de API de Gemini para Refinamiento
+ *   **Estatus:** Aceptado
+ *   **Contexto:** Necesitamos un descubrimiento inteligente de requisitos.
+ *   **Decisión:** Integrar Gemini para generar preguntas condicionales y pre-escribir las specs.
+ *   **Consecuencias:** Mayor velocidad de diseño y consistencia técnica inicial.
+ """
             elif filename == "glossary.md":
                 content = f"""# Glosario de Términos
-
-*   **MVP:** Minimum Viable Product (Producto Mínimo Viable).
-*   **Spec IDE:** Entorno de especificaciones técnicas interactivas.
-*   **SSOT:** Single Source of Truth (Fuente única de verdad).
-"""
+ 
+ *   **MVP:** Minimum Viable Product (Producto Mínimo Viable).
+ *   **Spec IDE:** Entorno de especificaciones técnicas interactivas.
+ *   **SSOT:** Single Source of Truth (Fuente única de verdad).
+ """
             elif filename == "agents.md":
                 content = f"""# Instrucciones para Agentes de Código (System Prompts)
-
-Este archivo sirve como prompt del sistema para herramientas como Cursor, Cline, Aider o Roo Code.
-
-```text
-Actúa como un desarrollador experto que va a implementar el proyecto.
-Tu fuente única de verdad es la carpeta /specs del proyecto.
-No escribas código que contradiga las definiciones en:
-- architecture.md
-- database.md
-- api.md
-```
-"""
+ 
+ Este archivo sirve como prompt del sistema para herramientas como Cursor, Cline, Aider o Roo Code.
+ 
+ ```text
+ Actúa como un desarrollador experto que va a implementar el proyecto.
+ Tu fuente única de verdad es la carpeta /specs del proyecto.
+ No escribas código que contradiga las definiciones en:
+ - architecture.md
+ - database.md
+ - api.md
+ ```
+ """
             else:
                 content = f"# Especificación: {filename.replace('.md', '').capitalize()}\n\nContenido pendiente de refinamiento por el usuario."
         
@@ -488,9 +559,17 @@ No escribas código que contradiga las definiciones en:
             with open(filepath, "w", encoding="utf-8") as f:
                 f.write(content.strip())
             generated_files.append(filename)
+            project["specModules"][filename.replace(".md", "")] = content.strip()
         except Exception as e:
             logger.error(f"Error escribiendo el archivo {filename}: {str(e)}")
             
+    # Guardar el proyecto con los specModules cargados en project.json
+    try:
+        with open(PROJECT_FILE, "w", encoding="utf-8") as f:
+            json.dump(project, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        logger.error(f"Error escribiendo en {PROJECT_FILE} en export_specs: {str(e)}")
+        
     return {
         "status": "success",
         "message": f"Se han generado {len(generated_files)} archivos de especificación en el directorio /specs/",

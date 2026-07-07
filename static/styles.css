@@ -1277,6 +1277,70 @@ body {
     to { transform: translateY(0); opacity: 1; }
 }
 
+/* ==========================================================================
+   METODOLOGÍA DE GENERACIÓN - SELECCIÓN DE CAMINO
+   ========================================================================== */
+.path-selection-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 6px;
+    margin-bottom: 8px;
+}
+.path-option {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 14px 18px;
+    background-color: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.path-option:hover {
+    border-color: var(--primary-hover);
+    background-color: rgba(123, 97, 255, 0.04);
+    transform: translateY(-1px);
+}
+.path-option.active {
+    border-color: var(--primary);
+    background-color: rgba(123, 97, 255, 0.08);
+    box-shadow: 0 4px 12px rgba(123, 97, 255, 0.08);
+}
+.path-option-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 8px;
+    background-color: rgba(255, 255, 255, 0.04);
+    font-size: 16px;
+    color: var(--text-secondary);
+    transition: all 0.2s;
+}
+.path-option.active .path-option-icon {
+    background: var(--primary-gradient);
+    color: #ffffff;
+}
+.path-option-info {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+.path-title {
+    font-family: var(--font-title);
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--text-primary);
+}
+.path-desc {
+    font-size: 11px;
+    color: var(--text-secondary);
+    line-height: 1.35;
+}
+
 .hidden {
     display: none !important;
 }
