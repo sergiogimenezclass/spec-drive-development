@@ -22,7 +22,8 @@ const state = {
     activeSpecFile: 'product.md',
     questionTree: [],
     activeQuestionIndex: 0,
-    isDarkTheme: true
+    isDarkTheme: true,
+    hasBackendApiKey: false
 };
 
 // Estructura fija de los 16 archivos de la spec
@@ -56,6 +57,9 @@ async function initApp() {
     setupTheme();
     setupEventListeners();
     
+    // Verificar si el backend tiene la API Key de Gemini configurada
+    await checkBackendConfig();
+    
     // Intentar cargar proyecto existente del backend
     await checkExistingProject();
 }
@@ -68,6 +72,27 @@ function loadSettings() {
     const theme = localStorage.getItem('theme');
     if (theme === 'light') {
         state.isDarkTheme = false;
+    }
+}
+
+// Verificar si el servidor ya tiene la API Key configurada
+async function checkBackendConfig() {
+    try {
+        const response = await fetch('/api/config');
+        const data = await response.json();
+        state.hasBackendApiKey = data.hasApiKey;
+        
+        const keyInput = document.getElementById('gemini-api-key');
+        if (state.hasBackendApiKey) {
+            if (!state.apiKey) {
+                keyInput.placeholder = "Configurada en servidor (.env)";
+                keyInput.value = "";
+            } else {
+                keyInput.placeholder = "Gemini API Key...";
+            }
+        }
+    } catch (e) {
+        console.error("Error al obtener la configuración del backend:", e);
     }
 }
 
@@ -307,8 +332,8 @@ async function startDiscoveryFlow() {
         return;
     }
     
-    if (!state.apiKey) {
-        showToast("Es necesario ingresar una API Key de Gemini en el Header", "error");
+    if (!state.apiKey && !state.hasBackendApiKey) {
+        showToast("Es necesario ingresar una API Key de Gemini en el Header o configurarla en el servidor", "error");
         return;
     }
     
@@ -667,8 +692,8 @@ function renderMarkdownHTML(md) {
 
 // Completar la sección activa usando Gemini
 async function autocompleteActiveSection() {
-    if (!state.apiKey) {
-        showToast("Ingresa tu API Key de Gemini en el Header", "error");
+    if (!state.apiKey && !state.hasBackendApiKey) {
+        showToast("Ingresa tu API Key de Gemini en el Header o configúrala en el servidor", "error");
         return;
     }
     
@@ -727,8 +752,8 @@ async function saveProjectToServer() {
 
 // Exportar las especificaciones y escribirlas en el disco local
 async function exportSpecsToDisk() {
-    if (!state.apiKey) {
-        showToast("Ingresa tu API Key de Gemini en el Header", "error");
+    if (!state.apiKey && !state.hasBackendApiKey) {
+        showToast("Ingresa tu API Key de Gemini en el Header o configúrala en el servidor", "error");
         return;
     }
     
@@ -757,8 +782,8 @@ async function exportSpecsToDisk() {
 
 // Generar diagrama Mermaid interactivo
 async function generateDiagram() {
-    if (!state.apiKey) {
-        showToast("Ingresa tu API Key de Gemini en el Header", "error");
+    if (!state.apiKey && !state.hasBackendApiKey) {
+        showToast("Ingresa tu API Key de Gemini en el Header o configúrala en el servidor", "error");
         return;
     }
     
@@ -803,8 +828,8 @@ async function generateDiagram() {
 
 // Correr validador de consistencia (Linter)
 async function runConsistencyCheck() {
-    if (!state.apiKey) {
-        showToast("Ingresa tu API Key de Gemini en el Header", "error");
+    if (!state.apiKey && !state.hasBackendApiKey) {
+        showToast("Ingresa tu API Key de Gemini en el Header o configúrala en el servidor", "error");
         return;
     }
     
@@ -877,8 +902,8 @@ async function sendCopilotMessage() {
     const msg = inputEl.value.trim();
     if (!msg) return;
     
-    if (!state.apiKey) {
-        showToast("Ingresa tu API Key de Gemini en el Header", "error");
+    if (!state.apiKey && !state.hasBackendApiKey) {
+        showToast("Ingresa tu API Key de Gemini en el Header o configúrala en el servidor", "error");
         return;
     }
     

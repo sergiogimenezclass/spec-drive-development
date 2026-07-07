@@ -12,6 +12,23 @@ import google.generativeai as genai
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("spec-ide-backend")
 
+# Cargar variables de entorno desde un archivo .env si existe
+def load_dotenv():
+    dotenv_path = os.path.join(os.path.dirname(__file__), ".env")
+    if os.path.exists(dotenv_path):
+        logger.info("Cargando variables desde archivo .env local")
+        with open(dotenv_path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#"):
+                    parts = line.split("=", 1)
+                    if len(parts) == 2:
+                        key = parts[0].strip()
+                        val = parts[1].strip().strip('"').strip("'")
+                        os.environ[key] = val
+
+load_dotenv()
+
 app = FastAPI(title="Spec IDE Backend")
 
 PROJECT_FILE = "project.json"
@@ -38,10 +55,17 @@ class CopilotRequest(BaseModel):
 
 # Helper para configurar Gemini y obtener el modelo
 def get_gemini_model(api_key: str):
-    if not api_key:
-        raise HTTPException(status_code=401, detail="Falta la API Key de Gemini en los headers (X-Gemini-Key)")
+    key_to_use = api_key.strip() if api_key else ""
+    if not key_to_use:
+        key_to_use = os.environ.get("GEMINI_API_KEY", "").strip()
+        
+    if not key_to_use:
+        raise HTTPException(
+            status_code=401, 
+            detail="Falta la API Key de Gemini. Configúrala en la interfaz web o mediante la variable de entorno GEMINI_API_KEY."
+        )
     try:
-        genai.configure(api_key=api_key)
+        genai.configure(api_key=key_to_use)
         # Usamos gemini-1.5-flash para velocidad y consistencia
         return genai.GenerativeModel("gemini-1.5-flash")
     except Exception as e:
@@ -54,6 +78,11 @@ if not os.path.exists(static_dir):
     os.makedirs(static_dir)
 
 # Endpoints de la API
+
+@app.get("/api/config")
+async def get_config():
+    has_key = bool(os.environ.get("GEMINI_API_KEY"))
+    return {"hasApiKey": has_key}
 
 @app.post("/api/analyze-idea")
 async def analyze_idea(req: IdeaAnalysisRequest, x_gemini_key: str = Header(None)):
