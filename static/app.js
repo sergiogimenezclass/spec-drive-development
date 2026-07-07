@@ -234,6 +234,29 @@ function setupEventListeners() {
     // Exportar Specs
     document.getElementById('btn-export-specs').addEventListener('click', exportSpecsToDisk);
 
+    // Modal de Planificación de Features
+    const planningModal = document.getElementById('planning-modal');
+    
+    document.getElementById('btn-open-planning').addEventListener('click', () => {
+        showPlanningState('initial');
+        planningModal.classList.remove('hidden');
+    });
+    
+    document.getElementById('btn-close-planning-modal').addEventListener('click', () => {
+        planningModal.classList.add('hidden');
+    });
+    
+    document.getElementById('planning-modal-overlay').addEventListener('click', () => {
+        planningModal.classList.add('hidden');
+    });
+    
+    document.getElementById('btn-cancel-generation').addEventListener('click', () => {
+        planningModal.classList.add('hidden');
+    });
+    
+    document.getElementById('btn-start-planning-analysis').addEventListener('click', runPlanningAnalysis);
+    document.getElementById('btn-submit-generation').addEventListener('click', submitFeatureGeneration);
+
     // Guardar Manual en Workspace
     document.getElementById('btn-save-project-manual').addEventListener('click', saveProjectToServer);
 
@@ -613,6 +636,7 @@ function renderSpecTree() {
     const nav = document.getElementById('spec-tree-nav');
     nav.innerHTML = '';
     
+    // 1. Renderizar especificaciones fijas (SPEC_FILES)
     SPEC_FILES.forEach(file => {
         const item = document.createElement('div');
         item.className = `spec-tree-item ${state.activeSpecFile === file.name ? 'active' : ''}`;
@@ -635,6 +659,53 @@ function renderSpecTree() {
         
         nav.appendChild(item);
     });
+    
+    // 2. Renderizar características dinámicas si existen
+    const featuresList = state.currentProject.featuresList || [];
+    if (featuresList.length > 0) {
+        const header = document.createElement('div');
+        header.className = 'spec-tree-header-sep';
+        header.style.cssText = "padding: var(--spacing-sm) var(--spacing-md); font-size: 11px; font-weight: bold; color: var(--text-secondary); text-transform: uppercase; margin-top: var(--spacing-md); border-top: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between;";
+        header.innerHTML = `<span>Features & Módulos</span> <span class="badge" style="font-size:9px; background:rgba(255,255,255,0.05); padding:1px 5px; border-radius:3px;">${featuresList.length}</span>`;
+        nav.appendChild(header);
+        
+        // Agrupar por carpeta temática
+        const folders = {};
+        featuresList.forEach(feat => {
+            const fName = feat.folder || 'general';
+            if (!folders[fName]) folders[fName] = [];
+            folders[fName].push(feat);
+        });
+        
+        Object.keys(folders).forEach(folderName => {
+            const folderItem = document.createElement('div');
+            folderItem.className = 'spec-tree-folder';
+            folderItem.style.cssText = "padding: 6px 16px; font-size: 12px; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 8px;";
+            folderItem.innerHTML = `<i class="fa-solid fa-folder-open" style="color: var(--primary-color); font-size: 11px;"></i> <span>features/${folderName}</span>`;
+            nav.appendChild(folderItem);
+            
+            folders[folderName].forEach(feat => {
+                const fileKey = `features/${folderName}/${feat.id}`;
+                const item = document.createElement('div');
+                item.className = `spec-tree-item ${state.activeSpecFile === fileKey ? 'active' : ''}`;
+                item.style.paddingLeft = '32px';
+                
+                item.innerHTML = `
+                    <div class="spec-item-left">
+                        <i class="fa-regular fa-file-lines" style="font-size: 11px;"></i>
+                        <span>${feat.name}</span>
+                    </div>
+                    <span class="spec-status-indicator status-completed"></span>
+                `;
+                
+                item.addEventListener('click', () => {
+                    selectSpecFile(fileKey);
+                });
+                
+                nav.appendChild(item);
+            });
+        });
+    }
 }
 
 // Seleccionar archivo activo en el IDE
@@ -649,83 +720,100 @@ function selectSpecFile(filename) {
     const formContainer = document.getElementById('active-spec-form-container');
     formContainer.innerHTML = '';
     
-    // Buscamos preguntas previas del Wizard de esta categoría
-    const fileCategoryMap = {
-        'product.md': 'Producto',
-        'requirements.md': 'Requisitos',
-        'architecture.md': 'Arquitectura',
-        'database.md': 'Base de datos',
-        'api.md': 'API',
-        'security.md': 'Seguridad',
-        'roadmap.md': 'General'
-    };
+    const isFeature = filename.startsWith('features/');
+    const formTab = Array.from(document.querySelectorAll('.editor-tab')).find(t => t.dataset.view === 'form');
     
-    const cat = fileCategoryMap[filename] || '';
-    const relevantQuestions = state.questionTree.filter(q => q.section === cat);
-    
-    if (relevantQuestions.length > 0) {
-        const title = document.createElement('h3');
-        title.innerText = `Datos estructurados - ${cat}`;
-        formContainer.appendChild(title);
+    if (isFeature) {
+        if (formTab) formTab.classList.add('hidden');
+        switchEditorView('markdown');
         
-        relevantQuestions.forEach(q => {
-            const formGroup = document.createElement('div');
-            formGroup.className = 'form-group';
-            
-            const label = document.createElement('label');
-            label.innerText = q.label;
-            formGroup.appendChild(label);
-            
-            const val = state.currentProject.answers[q.id] || '';
-            
-            if (q.type === 'select') {
-                const select = document.createElement('select');
-                select.style.padding = '12px';
-                select.style.backgroundColor = 'rgba(255,255,255,0.04)';
-                select.style.color = 'var(--text-primary)';
-                select.style.border = '1px solid var(--border-color)';
-                select.style.borderRadius = '8px';
-                select.style.outline = 'none';
-                
-                q.options.forEach(opt => {
-                    const option = document.createElement('option');
-                    option.value = opt;
-                    option.text = opt;
-                    if (opt === val) option.selected = true;
-                    select.appendChild(option);
-                });
-                
-                select.addEventListener('change', (e) => {
-                    state.currentProject.answers[q.id] = e.target.value;
-                    updateGlobalProgressBar();
-                });
-                formGroup.appendChild(select);
-            } else {
-                const input = document.createElement('textarea');
-                input.value = val;
-                input.addEventListener('input', (e) => {
-                    state.currentProject.answers[q.id] = e.target.value;
-                    updateGlobalProgressBar();
-                });
-                formGroup.appendChild(input);
-            }
-            formContainer.appendChild(formGroup);
-        });
+        // Cargar contenido de la feature
+        const mdContent = state.currentProject.specModules[filename] || '';
+        document.getElementById('markdown-raw-editor').value = mdContent;
+        renderMarkdownHTML(mdContent);
+        
     } else {
-        formContainer.innerHTML = `
-            <div class="empty-projects-state">
-                <i class="fa-solid fa-file-signature" style="font-size: 32px;"></i>
-                <h3>Sección Libre</h3>
-                <p>Usa la pestaña "Visualizar Markdown" o haz clic en "Completar con IA" para redactar esta especificación.</p>
-            </div>
-        `;
+        if (formTab) formTab.classList.remove('hidden');
+        switchEditorView('form');
+        
+        // Buscamos preguntas previas del Wizard de esta categoría
+        const fileCategoryMap = {
+            'product.md': 'Producto',
+            'requirements.md': 'Requisitos',
+            'architecture.md': 'Arquitectura',
+            'database.md': 'Base de datos',
+            'api.md': 'API',
+            'security.md': 'Seguridad',
+            'roadmap.md': 'General'
+        };
+        
+        const cat = fileCategoryMap[filename] || '';
+        const relevantQuestions = state.questionTree.filter(q => q.section === cat);
+        
+        if (relevantQuestions.length > 0) {
+            const title = document.createElement('h3');
+            title.innerText = `Datos estructurados - ${cat}`;
+            formContainer.appendChild(title);
+            
+            relevantQuestions.forEach(q => {
+                const formGroup = document.createElement('div');
+                formGroup.className = 'form-group';
+                
+                const label = document.createElement('label');
+                label.innerText = q.label;
+                formGroup.appendChild(label);
+                
+                const val = state.currentProject.answers[q.id] || '';
+                
+                if (q.type === 'select') {
+                    const select = document.createElement('select');
+                    select.style.padding = '12px';
+                    select.style.backgroundColor = 'rgba(255,255,255,0.04)';
+                    select.style.color = 'var(--text-primary)';
+                    select.style.border = '1px solid var(--border-color)';
+                    select.style.borderRadius = '8px';
+                    select.style.outline = 'none';
+                    
+                    q.options.forEach(opt => {
+                        const option = document.createElement('option');
+                        option.value = opt;
+                        option.text = opt;
+                        if (opt === val) option.selected = true;
+                        select.appendChild(option);
+                    });
+                    
+                    select.addEventListener('change', (e) => {
+                        state.currentProject.answers[q.id] = e.target.value;
+                        updateGlobalProgressBar();
+                    });
+                    formGroup.appendChild(select);
+                } else {
+                    const input = document.createElement('textarea');
+                    input.value = val;
+                    input.addEventListener('input', (e) => {
+                        state.currentProject.answers[q.id] = e.target.value;
+                        updateGlobalProgressBar();
+                    });
+                    formGroup.appendChild(input);
+                }
+                formContainer.appendChild(formGroup);
+            });
+        } else {
+            formContainer.innerHTML = `
+                <div class="empty-projects-state">
+                    <i class="fa-solid fa-file-signature" style="font-size: 32px;"></i>
+                    <h3>Sección Libre</h3>
+                    <p>Usa la pestaña "Visualizar Markdown" o haz clic en "Completar con IA" para redactar esta especificación.</p>
+                </div>
+            `;
+        }
+        
+        // Cargar contenido Markdown en el editor raw
+        const moduleName = filename.replace('.md', '').replace('.json', '');
+        const mdContent = (state.currentProject.specModules && state.currentProject.specModules[moduleName]) || '';
+        document.getElementById('markdown-raw-editor').value = mdContent;
+        renderMarkdownHTML(mdContent);
     }
-    
-    // Cargar contenido Markdown en el editor raw
-    const moduleName = filename.replace('.md', '').replace('.json', '');
-    const mdContent = (state.currentProject.specModules && state.currentProject.specModules[moduleName]) || '';
-    document.getElementById('markdown-raw-editor').value = mdContent;
-    renderMarkdownHTML(mdContent);
 }
 
 // Actualizar la pestaña de Markdown Preview
@@ -1104,4 +1192,176 @@ function showToast(message, type = 'info') {
             toast.remove();
         }, 300);
     }, 3500);
+}
+
+// Alternar vista del editor (Respuestas vs Markdown)
+function switchEditorView(viewName) {
+    const editorTabs = document.querySelectorAll('.editor-tab');
+    editorTabs.forEach(t => {
+        if (t.dataset.view === viewName) {
+            t.classList.add('active');
+        } else {
+            t.classList.remove('active');
+        }
+    });
+    document.querySelectorAll('.editor-tab-content').forEach(c => c.classList.remove('active'));
+    
+    const viewEl = document.getElementById(`editor-view-${viewName}`);
+    if (viewEl) viewEl.classList.add('active');
+    
+    if (viewName === 'markdown') {
+        updateMarkdownPreview();
+    }
+}
+
+// Cambiar estado visual del modal de planificación
+function showPlanningState(stateName) {
+    document.querySelectorAll('.planning-state').forEach(el => el.classList.add('hidden'));
+    const stateEl = document.getElementById(`planning-state-${stateName}`);
+    if (stateEl) stateEl.classList.remove('hidden');
+}
+
+// Analizar proyecto para sugerir features
+async function runPlanningAnalysis() {
+    if (!state.apiKey && !state.hasBackendApiKey) {
+        showToast("Ingresa tu API Key de Gemini en el Header o configúrala en el servidor", "error");
+        return;
+    }
+    
+    showPlanningState('loading-list');
+    
+    try {
+        const response = await fetch('/api/plan-features', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Gemini-Key': state.apiKey
+            },
+            body: JSON.stringify({ project_data: state.currentProject })
+        });
+        
+        const data = await response.json();
+        if (data.status === 'success' || data.status === 'fallback') {
+            const features = data.features || [];
+            displayFeaturesChecklist(features);
+            showPlanningState('list');
+        } else {
+            showToast("Error al planificar features: " + data.message, "error");
+            showPlanningState('initial');
+        }
+    } catch (err) {
+        showToast("Error de conexión al planificar features", "error");
+        showPlanningState('initial');
+    }
+}
+
+// Mostrar checklist de features encontradas
+function displayFeaturesChecklist(features) {
+    const container = document.getElementById('features-checklist-container');
+    container.innerHTML = '';
+    
+    features.forEach(feat => {
+        const item = document.createElement('div');
+        item.className = 'feature-checklist-item';
+        
+        item.innerHTML = `
+            <input type="checkbox" id="chk-feat-${feat.id}" data-id="${feat.id}" data-name="${feat.name}" data-desc="${feat.description}" data-folder="${feat.folder}" checked>
+            <div class="feature-item-text">
+                <div class="feature-item-title">${feat.name}</div>
+                <div class="feature-item-desc">${feat.description}</div>
+                <div class="feature-item-folder">features/${feat.folder}</div>
+            </div>
+        `;
+        
+        item.addEventListener('click', (e) => {
+            if (e.target.tagName !== 'INPUT') {
+                const chk = item.querySelector('input[type="checkbox"]');
+                chk.checked = !chk.checked;
+            }
+        });
+        
+        container.appendChild(item);
+    });
+}
+
+// Procesar y generar individualmente las features seleccionadas
+async function submitFeatureGeneration() {
+    const checkboxes = document.querySelectorAll('#features-checklist-container input[type="checkbox"]:checked');
+    if (checkboxes.length === 0) {
+        showToast("Selecciona al menos una feature para generar", "error");
+        return;
+    }
+    
+    const featuresToGenerate = Array.from(checkboxes).map(chk => ({
+        id: chk.dataset.id,
+        name: chk.dataset.name,
+        description: chk.dataset.desc,
+        folder: chk.dataset.folder
+    }));
+    
+    showPlanningState('generating');
+    
+    const logContainer = document.getElementById('generation-log-container');
+    logContainer.innerHTML = '';
+    
+    const total = featuresToGenerate.length;
+    let completed = 0;
+    
+    for (let i = 0; i < total; i++) {
+        const feat = featuresToGenerate[i];
+        
+        document.getElementById('generation-progress-text').innerText = `Generando feature ${i+1} de ${total}: ${feat.name}...`;
+        const progressPercent = Math.round((i / total) * 100);
+        document.getElementById('planning-progress-fill').style.width = `${progressPercent}%`;
+        
+        const logItem = document.createElement('div');
+        logItem.className = 'log-item loading';
+        logItem.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> <span>Generando ${feat.name}...</span>`;
+        logContainer.appendChild(logItem);
+        logContainer.scrollTop = logContainer.scrollHeight;
+        
+        try {
+            const response = await fetch('/api/generate-feature', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Gemini-Key': state.apiKey
+                },
+                body: JSON.stringify({
+                    project_data: state.currentProject,
+                    feature: feat
+                })
+            });
+            
+            const data = await response.json();
+            if (data.status === 'success') {
+                logItem.className = 'log-item success';
+                logItem.innerHTML = `<i class="fa-solid fa-circle-check"></i> <span>¡Listo! ${feat.name} guardado</span>`;
+                state.currentProject = data.project_data;
+                completed++;
+            } else {
+                logItem.className = 'log-item error';
+                logItem.innerHTML = `<i class="fa-solid fa-circle-xmark"></i> <span>Error en ${feat.name}</span>`;
+            }
+        } catch (err) {
+            logItem.className = 'log-item error';
+            logItem.innerHTML = `<i class="fa-solid fa-circle-xmark"></i> <span>Error de red en ${feat.name}</span>`;
+        }
+    }
+    
+    document.getElementById('generation-progress-text').innerText = `Proceso completado. ${completed} de ${total} features generadas con éxito.`;
+    document.getElementById('planning-progress-fill').style.width = `100%`;
+    
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'btn btn-primary btn-sm';
+    closeBtn.style.marginTop = '16px';
+    closeBtn.innerText = 'Cerrar y Ver en Workspace';
+    closeBtn.addEventListener('click', () => {
+        document.getElementById('planning-modal').classList.add('hidden');
+        renderSpecTree();
+    });
+    logContainer.appendChild(closeBtn);
+    logContainer.scrollTop = logContainer.scrollHeight;
+    
+    renderSpecTree();
 }

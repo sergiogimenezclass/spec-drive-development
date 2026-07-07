@@ -238,6 +238,12 @@
                         <nav class="spec-tree" id="spec-tree-nav">
                             <!-- Los archivos de especificación se inyectan aquí dinámicamente -->
                         </nav>
+                        <div class="sidebar-planning-action" style="padding: var(--spacing-md); border-top: 1px solid var(--border-color);">
+                            <button id="btn-open-planning" class="btn btn-border btn-full-width" style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+                                <i class="fa-solid fa-folder-plus" style="color: var(--primary-color);"></i>
+                                Desglosar Features con IA
+                            </button>
+                        </div>
                     </aside>
 
                     <!-- PANEL CENTRAL: EDITOR Y DETALLE -->
@@ -346,6 +352,64 @@
             </section>
 
         </main>
+    </div>
+
+    <!-- MODAL DE PLANIFICACIÓN DE FEATURES -->
+    <div id="planning-modal" class="modal hidden">
+        <div class="modal-overlay" id="planning-modal-overlay"></div>
+        <div class="modal-content glass-card">
+            <div class="modal-header">
+                <h2><i class="fa-solid fa-compass-drafting" style="color: var(--primary-color);"></i> Planificación & Desglose de Features</h2>
+                <button class="modal-close-btn" id="btn-close-planning-modal"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <p>Gemini analizará tu documentación de producto y base de datos actual para estructurar las historias de usuario y criterios de aceptación específicos de cada característica del sistema.</p>
+                
+                <!-- Estado 1: Botón de análisis inicial -->
+                <div id="planning-state-initial" class="planning-state">
+                    <button id="btn-start-planning-analysis" class="btn btn-primary btn-full-width">
+                        <i class="fa-solid fa-magnifying-glass-chart"></i> Analizar Proyecto y Proponer Features
+                    </button>
+                </div>
+                
+                <!-- Estado 2: Cargando lista -->
+                <div id="planning-state-loading-list" class="planning-state hidden">
+                    <div class="spinner-container">
+                        <div class="spinner"></div>
+                        <p>Analizando especificaciones base con Gemini...</p>
+                    </div>
+                </div>
+                
+                <!-- Estado 3: Lista de features encontradas -->
+                <div id="planning-state-list" class="planning-state hidden">
+                    <h3>Features detectadas por la IA:</h3>
+                    <p style="font-size: 12px; margin-bottom: var(--spacing-md); color: var(--text-secondary);">Selecciona las características que deseas generar en detalle:</p>
+                    
+                    <div class="features-checklist-container" id="features-checklist-container">
+                        <!-- Lista de features con checkboxes -->
+                    </div>
+                    
+                    <div class="modal-footer" style="margin-top: var(--spacing-lg); display: flex; gap: var(--spacing-sm); justify-content: flex-end;">
+                        <button id="btn-cancel-generation" class="btn btn-border btn-sm">Cancelar</button>
+                        <button id="btn-submit-generation" class="btn btn-primary btn-sm">Generar Seleccionadas</button>
+                    </div>
+                </div>
+                
+                <!-- Estado 4: Generando individualmente -->
+                <div id="planning-state-generating" class="planning-state hidden">
+                    <h3>Generando Fichas de Feature</h3>
+                    <p id="generation-progress-text" style="margin-bottom: var(--spacing-xs); font-size: 13px;">Procesando feature...</p>
+                    
+                    <div class="progress-track" style="margin: var(--spacing-md) 0; height: 6px; background: rgba(255,255,255,0.05); border-radius: 3px; overflow: hidden;">
+                        <div class="progress-fill" id="planning-progress-fill" style="width: 0%; height: 100%; background: var(--primary-gradient); transition: width 0.3s;"></div>
+                    </div>
+                    
+                    <div class="generation-log" id="generation-log-container" style="margin-top: var(--spacing-md);">
+                        <!-- Logs de generación de cada archivo -->
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Notificaciones flotantes -->

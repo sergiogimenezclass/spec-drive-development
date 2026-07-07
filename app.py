@@ -656,11 +656,167 @@ async def export_specs(req: SaveProjectRequest, x_gemini_key: str = Header(None)
     except Exception as e:
         logger.error(f"Error escribiendo en {PROJECT_FILE} en export_specs: {str(e)}")
         
-    return {
-        "status": "success",
-        "message": f"Se han generado {len(generated_files)} archivos de especificación en el directorio /specs/",
-        "files": generated_files
-    }
+@app.post("/api/plan-features")
+async def plan_features(req: SaveProjectRequest, x_gemini_key: str = Header(None)):
+    model = get_gemini_model(x_gemini_key)
+    project = req.project_data
+    answers = project.get("answers", {})
+    idea = project.get("seedIdea", "")
+    spec_modules = project.get("specModules", {})
+    
+    product_spec = spec_modules.get("product", "")
+    reqs_spec = spec_modules.get("requirements", "")
+    
+    prompt = f"""
+    Eres un Product Owner y Staff Software Architect.
+    Basándote en la idea del proyecto: "{idea}"
+    y la documentación de producto existente:
+    {product_spec}
+    {reqs_spec}
+    
+    Planifica la lista de características (features) y módulos necesarios para implementar la visión del producto.
+    Debes identificar entre 8 y 10 características clave.
+    Para cada característica, define:
+    1. Un ID corto, descriptivo y en minúsculas (ej: "login", "create-appointment").
+    2. Un nombre claro en español (ej: "Inicio de Sesión", "Reserva de Cita").
+    3. Una descripción breve (1-2 líneas).
+    4. Un nombre de directorio temático para agruparlo (ej: "auth", "dashboard", "appointments", "billing").
+    
+    Devuelve la información estructurada en el siguiente formato JSON estricto:
+    [
+        {{
+            "id": "id-corto",
+            "name": "Nombre de la Feature",
+            "description": "Descripción de la feature",
+            "folder": "nombre-carpeta"
+        }}
+    ]
+    """
+    
+    try:
+        response = model.generate_content(
+            prompt,
+            generation_config={"response_mime_type": "application/json"}
+        )
+        features = json.loads(response.text.strip())
+        return {"status": "success", "features": features}
+    except Exception as e:
+        logger.error(f"Error planificando features por IA: {str(e)}")
+        fallback_features = [
+            {"id": "auth", "name": "Autenticación y Registro", "description": "Gestión de registro de usuarios y control de acceso.", "folder": "auth"},
+            {"id": "dashboard", "name": "Dashboard Principal", "description": "Vista consolidada de información clave y accesos rápidos.", "folder": "dashboard"},
+            {"id": "profile", "name": "Gestión de Perfil", "description": "Edición de datos de usuario y configuraciones personales.", "folder": "profile"},
+            {"id": "core-flow", "name": "Flujo Principal", "description": f"Funcionalidad principal del sistema para {idea}", "folder": "core"},
+            {"id": "notifications", "name": "Módulo de Notificaciones", "description": "Envío de correos y alertas en tiempo real al usuario.", "folder": "notifications"},
+            {"id": "settings", "name": "Configuraciones", "description": "Ajustes avanzados de seguridad e idioma.", "folder": "settings"},
+            {"id": "reports", "name": "Reportes y Estadísticas", "description": "Auditoría, logs de actividad y métricas de negocio.", "folder": "reports"},
+            {"id": "api-keys", "name": "Gestión de API Keys", "description": "Generación y revocación de tokens de acceso externo.", "folder": "developer"}
+        ]
+        return {"status": "fallback", "features": fallback_features}
+
+class GenerateFeatureRequest(BaseModel):
+    project_data: dict
+    feature: dict
+
+@app.post("/api/generate-feature")
+async def generate_feature(req: GenerateFeatureRequest, x_gemini_key: str = Header(None)):
+    model = get_gemini_model(x_gemini_key)
+    project = req.project_data
+    feature = req.feature
+    
+    answers = project.get("answers", {})
+    idea = project.get("seedIdea", "")
+    spec_modules = project.get("specModules", {})
+    
+    features_dir = os.path.join(SPECS_DIR, "features")
+    folder = feature.get("folder", "general").strip().lower()
+    feature_id = feature.get("id", "feature").strip().lower()
+    
+    folder_path = os.path.join(features_dir, folder)
+    if not os.path.exists(folder_path):
+        os.makedirs(folder_path)
+        
+    filepath = os.path.join(folder_path, f"{feature_id}.md")
+    
+    product_spec = spec_modules.get("product", "")
+    db_spec = spec_modules.get("database", "")
+    
+    prompt = f"""
+    Eres un Product Owner y Analista Técnico de Software.
+    Tu tarea es redactar la especificación técnica en Markdown para la siguiente feature:
+    
+    Nombre: {feature.get('name')}
+    Descripción: {feature.get('description')}
+    Categoría/Carpeta: {folder}
+    
+    Contexto General del Proyecto:
+    Idea: "{idea}"
+    Visión del producto: {product_spec}
+    Esquema de Base de Datos: {db_spec}
+    
+    Debes redactar un archivo Markdown detallado que incluya obligatoriamente:
+    1. Historia de Usuario (User Story): Formato "Como [Rol], Quiero [Acción], Para [Beneficio]".
+    2. Criterios de Aceptación Detallados: Reglas de comportamiento esperadas (con formato Dado/Cuando/Entonces si aplica).
+    3. Casos de Error y Casos Borde (Edge cases): Errores de red, entradas inválidas, violaciones de reglas de negocio, etc.
+    
+    Restricción Absoluta:
+    * NO escribas código de implementación (como funciones, endpoints en Node/Python, etc.). Mantente exclusivamente en la etapa de diseño funcional, diseño técnico y documentación.
+    * Devuelve únicamente el contenido Markdown listo para ser guardado. No utilices bloques de código Markdown (como ```markdown) para envolver tu respuesta.
+    """
+    
+    content = ""
+    try:
+        resp = model.generate_content(prompt)
+        content = clean_markdown(resp.text)
+    except Exception as e:
+        logger.error(f"Error generando feature {feature_id} por IA: {str(e)}")
+        content = f"""# Feature: {feature.get('name')}
+        
+## Descripción
+{feature.get('description')}
+
+## Historia de Usuario
+**Como** Usuario del sistema  
+**Quiero** utilizar la función de {feature.get('name')}  
+**Para** cumplir con mi objetivo en la plataforma.
+
+## Criterios de Aceptación
+1. **Acceso básico:** Dado un usuario logueado, cuando accede a la sección, el sistema muestra la interfaz de {feature.get('name')}.
+2. **Validación:** El sistema debe comprobar la validez de los datos de entrada antes de procesarlos.
+
+## Casos de Error (Edge Cases)
+*   **Error 1:** Si se envían campos vacíos, el sistema debe retornar un código 400 Bad Request.
+*   **Error 2:** Si ocurre un error de conexión, se debe alertar al usuario y reintentar la acción.
+"""
+        
+    try:
+        with open(filepath, "w", encoding="utf-8") as f:
+            f.write(content.strip())
+            
+        if "specModules" not in project:
+            project["specModules"] = {}
+            
+        key_name = f"features/{folder}/{feature_id}"
+        project["specModules"][key_name] = content.strip()
+        
+        if "featuresList" not in project:
+            project["featuresList"] = []
+            
+        if not any(f.get("id") == feature_id for f in project["featuresList"]):
+            project["featuresList"].append(feature)
+            
+        with open(PROJECT_FILE, "w", encoding="utf-8") as f:
+            json.dump(project, f, ensure_ascii=False, indent=2)
+            
+        return {
+            "status": "success", 
+            "filepath": f"features/{folder}/{feature_id}.md", 
+            "content": content.strip(),
+            "project_data": project
+        }
+    except Exception as e:
+        logger.error(f"Error guardando feature en disco: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/copilot")
 async def copilot_chat(req: CopilotRequest, x_gemini_key: str = Header(None)):
