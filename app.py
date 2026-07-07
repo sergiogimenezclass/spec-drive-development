@@ -315,7 +315,7 @@ async def export_specs(req: SaveProjectRequest, x_gemini_key: str = Header(None)
     # Definimos la lista de archivos a generar
     files_to_generate = [
         "project.md", "product.md", "requirements.md", "user-stories.md",
-        "architecture.md", "database.md", "api.md", "frontend.md",
+        "architecture.md", "database.md", "api.md", "openapi.json", "frontend.md",
         "backend.md", "security.md", "integrations.md", "roadmap.md",
         "tasks.md", "decisions.md", "glossary.md", "agents.md"
     ]
@@ -329,10 +329,11 @@ async def export_specs(req: SaveProjectRequest, x_gemini_key: str = Header(None)
         Eres un Staff Software Architect y Product Designer.
         Genera el contenido completo en formato Markdown para el archivo 'product.md'.
         Debe incluir:
-        1. Visión General del Producto
-        2. Objetivos de Negocio y Métricas de Éxito
-        3. Usuarios, Actores y sus Roles detallados
-        4. Casos de Uso principales e Historias clave
+        1. Visión General del Producto y Propuesta de Valor.
+        2. Objetivos de Negocio y Métricas de Éxito.
+        3. Usuarios, Actores y sus Roles detallados.
+        4. Reglas de Negocio Críticas e Inquebrantables (como validaciones lógicas obligatorias, límites de dominio, ej: stock nunca negativo, borrados lógicos obligatorios, etc. estructurados como una lista clara con ejemplos).
+        5. Casos de Uso principales e Historias clave.
         
         Basándote en la idea del proyecto: "{idea}"
         y las respuestas recopiladas: {json.dumps(answers, ensure_ascii=False)}
@@ -376,7 +377,8 @@ async def export_specs(req: SaveProjectRequest, x_gemini_key: str = Header(None)
         Debe incluir:
         1. Diseño Conceptual del Modelo de Datos.
         2. Listado de Entidades principales con sus atributos (tipos de datos) y relaciones.
-        3. Índices, restricciones o consideraciones de rendimiento.
+        3. Esquema físico completo escrito en sintaxis Prisma DSL (un bloque de código schema.prisma completo y listo para copiar).
+        4. Índices, restricciones o consideraciones de rendimiento.
         
         Basándote en la idea del proyecto: "{idea}"
         y las respuestas recopiladas: {json.dumps(answers, ensure_ascii=False)}
@@ -411,6 +413,80 @@ async def export_specs(req: SaveProjectRequest, x_gemini_key: str = Header(None)
         ai_markdowns["api.md"] = clean_markdown(resp.text)
     except Exception as e:
         logger.error(f"Error generando api.md por IA: {str(e)}")
+
+    # 4b. openapi.json
+    try:
+        api_json_prompt = f"""
+        Eres un Diseñador de APIs RESTful experto.
+        Genera una especificación OpenAPI 3.0 completa en formato JSON para el proyecto.
+        Debe describir todos los endpoints clave (autenticación, recursos principales del dominio).
+        Asegúrate de devolver ÚNICAMENTE el código JSON válido. No utilices bloques de código Markdown (como ```json) para envolver tu respuesta.
+        
+        Basándote en la idea del proyecto: "{idea}"
+        y las respuestas recopiladas: {json.dumps(answers, ensure_ascii=False)}
+        y metadatos: {json.dumps(metadata, ensure_ascii=False)}
+        """
+        logger.info("Generando openapi.json por IA...")
+        resp = model.generate_content(api_json_prompt)
+        json_content = clean_markdown(resp.text)
+        try:
+            json.loads(json_content)
+            ai_markdowns["openapi.json"] = json_content
+        except Exception as json_err:
+            logger.error(f"El JSON generado para openapi.json no es válido: {str(json_err)}")
+            ai_markdowns["openapi.json"] = json.dumps({
+                "openapi": "3.0.0",
+                "info": {
+                    "title": project.get("name", "Proyecto Spec-First") + " API",
+                    "version": "1.0.0",
+                    "description": f"Especificación de API generada automáticamente para {idea}"
+                },
+                "paths": {}
+            }, indent=2)
+    except Exception as e:
+        logger.error(f"Error generando openapi.json por IA: {str(e)}")
+
+    # 4c. glossary.md
+    try:
+        glossary_prompt = f"""
+        Eres un Ingeniero de Software experto.
+        Genera el contenido completo en formato Markdown para el archivo 'glossary.md'.
+        Debe incluir un glosario de términos del dominio del proyecto, con su traducción del Español al Inglés técnico sugerido para las variables del código, base de datos y endpoints (por ejemplo: Almacén: Warehouse, Existencias: Stock, etc.), asegurando coherencia conceptual y terminológica en todo el equipo.
+        
+        Basándote en la idea del proyecto: "{idea}"
+        y las respuestas recopiladas: {json.dumps(answers, ensure_ascii=False)}
+        y metadatos: {json.dumps(metadata, ensure_ascii=False)}
+        
+        Devuelve únicamente el contenido Markdown listo para ser guardado. No utilices bloques de código Markdown (como ```markdown) para envolver tu respuesta.
+        """
+        logger.info("Generando glossary.md por IA...")
+        resp = model.generate_content(glossary_prompt)
+        ai_markdowns["glossary.md"] = clean_markdown(resp.text)
+    except Exception as e:
+        logger.error(f"Error generando glossary.md por IA: {str(e)}")
+
+    # 4d. agents.md
+    try:
+        agents_prompt = f"""
+        Eres un Staff Software Architect.
+        Genera el contenido completo en formato Markdown para el archivo 'agents.md' (Instrucciones para Agentes de Código de IA).
+        Debe incluir:
+        1. Contexto básico de la aplicación para el agente.
+        2. Estilos de codificación explícitos (ej. camelCase en TypeScript, PascalCase en clases, etc.).
+        3. Reglas Técnicas de Comportamiento Crítico (ej. usar transacciones de base de datos para modificaciones financieras/inventario, usar middleware centralizado de errores, prohibir librerías no aprobadas, etc.).
+        4. Indicación de que su fuente única de verdad (SSOT) son las especificaciones de esta carpeta.
+        
+        Basándote en la idea del proyecto: "{idea}"
+        y las respuestas recopiladas: {json.dumps(answers, ensure_ascii=False)}
+        y metadatos: {json.dumps(metadata, ensure_ascii=False)}
+        
+        Devuelve únicamente el contenido Markdown listo para ser guardado. No utilices bloques de código Markdown (como ```markdown) para envolver tu respuesta.
+        """
+        logger.info("Generando agents.md por IA...")
+        resp = model.generate_content(agents_prompt)
+        ai_markdowns["agents.md"] = clean_markdown(resp.text)
+    except Exception as e:
+        logger.error(f"Error generando agents.md por IA: {str(e)}")
         
     # Plantillas de fallback para los archivos
     for filename in files_to_generate:
@@ -552,14 +628,24 @@ async def export_specs(req: SaveProjectRequest, x_gemini_key: str = Header(None)
  - api.md
  ```
  """
+            elif filename == "openapi.json":
+                content = json.dumps({
+                    "openapi": "3.0.0",
+                    "info": {
+                        "title": project.get("name", "Proyecto Spec-First") + " API",
+                        "version": "1.0.0",
+                        "description": f"Especificación de API para {idea}"
+                    },
+                    "paths": {}
+                }, indent=2)
             else:
-                content = f"# Especificación: {filename.replace('.md', '').capitalize()}\n\nContenido pendiente de refinamiento por el usuario."
+                content = f"# Especificación: {filename.replace('.md', '').replace('.json', '').capitalize()}\n\nContenido pendiente de refinamiento por el usuario."
         
         try:
             with open(filepath, "w", encoding="utf-8") as f:
                 f.write(content.strip())
             generated_files.append(filename)
-            project["specModules"][filename.replace(".md", "")] = content.strip()
+            project["specModules"][filename.replace(".md", "").replace(".json", "")] = content.strip()
         except Exception as e:
             logger.error(f"Error escribiendo el archivo {filename}: {str(e)}")
             

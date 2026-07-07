@@ -35,7 +35,8 @@ const SPEC_FILES = [
     { name: 'user-stories.md', label: 'Historias de Usuario', icon: 'fa-book-open-reader', status: 'pending' },
     { name: 'architecture.md', label: 'Arquitectura', icon: 'fa-sitemap', status: 'pending' },
     { name: 'database.md', label: 'Modelo de Datos', icon: 'fa-database', status: 'pending' },
-    { name: 'api.md', label: 'Contrato API', icon: 'fa-gears', status: 'pending' },
+    { name: 'api.md', label: 'Contrato API (MD)', icon: 'fa-gears', status: 'pending' },
+    { name: 'openapi.json', label: 'OpenAPI Spec (JSON)', icon: 'fa-code', status: 'pending' },
     { name: 'frontend.md', label: 'Especificación UI', icon: 'fa-window-maximize', status: 'pending' },
     { name: 'backend.md', label: 'Lógica Backend', icon: 'fa-server', status: 'pending' },
     { name: 'security.md', label: 'Seguridad & Roles', icon: 'fa-user-shield', status: 'pending' },
@@ -261,7 +262,7 @@ function setupEventListeners() {
         const text = e.target.value;
         renderMarkdownHTML(text);
         // Guardamos temporalmente en el estado
-        state.currentProject.specModules[state.activeSpecFile.replace('.md', '')] = text;
+        state.currentProject.specModules[state.activeSpecFile.replace('.md', '').replace('.json', '')] = text;
     });
 
     // Pestañas del Inspector (Diagramas, Linter, Chat)
@@ -323,7 +324,7 @@ function updateGlobalProgressBar() {
     SPEC_FILES.forEach(file => {
         if (file.name !== 'project.md' && file.name !== 'agents.md') {
             const hasContent = state.currentProject.answers[file.name] || 
-                                (state.currentProject.specModules && state.currentProject.specModules[file.name.replace('.md', '')]);
+                                (state.currentProject.specModules && state.currentProject.specModules[file.name.replace('.md', '').replace('.json', '')]);
             if (hasContent) {
                 file.status = 'completed';
                 completed++;
@@ -721,7 +722,7 @@ function selectSpecFile(filename) {
     }
     
     // Cargar contenido Markdown en el editor raw
-    const moduleName = filename.replace('.md', '');
+    const moduleName = filename.replace('.md', '').replace('.json', '');
     const mdContent = (state.currentProject.specModules && state.currentProject.specModules[moduleName]) || '';
     document.getElementById('markdown-raw-editor').value = mdContent;
     renderMarkdownHTML(mdContent);
@@ -730,7 +731,7 @@ function selectSpecFile(filename) {
 // Actualizar la pestaña de Markdown Preview
 function updateMarkdownPreview() {
     const filename = state.activeSpecFile;
-    const moduleName = filename.replace('.md', '');
+    const moduleName = filename.replace('.md', '').replace('.json', '');
     const currentText = document.getElementById('markdown-raw-editor').value;
     
     state.currentProject.specModules = state.currentProject.specModules || {};
@@ -744,6 +745,16 @@ function renderMarkdownHTML(md) {
     const pane = document.getElementById('markdown-preview-pane');
     if (!md) {
         pane.innerHTML = '<p style="color: var(--text-muted); font-style: italic;">Sin contenido generado aún. Haz clic en "Completar con IA" para redactar esta sección.</p>';
+        return;
+    }
+    
+    // Si es un archivo JSON, lo renderizamos como código formateado
+    if (state.activeSpecFile.endsWith('.json')) {
+        let escaped = md
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;");
+        pane.innerHTML = `<pre class="json-preview" style="background-color: rgba(0,0,0,0.2); padding: 15px; border-radius: 6px; font-family: 'Fira Code', monospace; font-size: 13px; color: #a9b1d6; overflow-x: auto; white-space: pre-wrap; max-height: 500px; border: 1px solid var(--border-color);"><code class="language-json">${escaped}</code></pre>`;
         return;
     }
     
@@ -776,7 +787,7 @@ async function autocompleteActiveSection() {
     }
     
     const filename = state.activeSpecFile;
-    const moduleName = filename.replace('.md', '');
+    const moduleName = filename.replace('.md', '').replace('.json', '');
     
     showToast(`Gemini está redactando ${filename}...`, "info");
     
