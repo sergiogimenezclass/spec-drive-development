@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spec IDE — Ingeniería de Especificaciones Spec-First</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <!-- FontAwesome para iconos -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Estilos personalizados -->
+    <link rel="stylesheet" href="styles.css">
+    <!-- Mermaid.js para renderizado de diagramas -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({
+            startOnLoad: false,
+            theme: 'dark',
+            securityLevel: 'loose'
+        });
+    </script>
+</head>
+<body class="dark-theme">
+    <!-- Fondo decorativo abstracto con gradientes orbitales -->
+    <div class="glow-orb orb-1"></div>
+    <div class="glow-orb orb-2"></div>
+    <div class="glow-orb orb-3"></div>
+
+    <div class="app-container">
+        <!-- HEADER PRINCIPAL -->
+        <header class="app-header">
+            <div class="header-left">
+                <div class="logo">
+                    <i class="fa-solid fa-microchip-heading"></i>
+                    <span>Spec <mark>IDE</mark></span>
+                </div>
+                <div class="project-indicator hidden" id="project-indicator">
+                    <span class="separator">/</span>
+                    <span id="current-project-name" class="project-name">Mi Proyecto</span>
+                    <span class="badge" id="project-status-badge">Descubrimiento</span>
+                </div>
+            </div>
+
+            <div class="header-center">
+                <!-- Barra de progreso global -->
+                <div class="global-progress-container hidden" id="global-progress-bar">
+                    <div class="progress-label">Completitud Spec: <span id="progress-percent">0%</span></div>
+                    <div class="progress-track">
+                        <div class="progress-fill" id="progress-fill-bar" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="header-right">
+                <!-- Clave API de Gemini -->
+                <div class="api-key-input-wrapper">
+                    <i class="fa-solid fa-key key-icon"></i>
+                    <input type="password" id="gemini-api-key" placeholder="Gemini API Key..." title="Ingresa tu Google AI Studio API Key">
+                    <button id="save-api-key-btn" title="Guardar clave localmente"><i class="fa-solid fa-floppy-disk"></i></button>
+                </div>
+
+                <!-- Selector de Tema -->
+                <button id="theme-toggle-btn" class="theme-btn" title="Cambiar tema">
+                    <i class="fa-solid fa-sun"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- CONTENIDO PRINCIPAL (CAMBIO DINÁMICO DE PANTALLAS) -->
+        <main class="app-main">
+
+            <!-- PANTALLA 1: DASHBOARD / INICIO -->
+            <section id="screen-dashboard" class="screen active">
+                <div class="dashboard-hero">
+                    <h1>Escribe especificaciones técnicas. <br><span>Antes de escribir una línea de código.</span></h1>
+                    <p class="hero-subtitle">Spec IDE transforma ideas abstractas en especificaciones modulares interconectadas y listas para alimentar a tus agentes de código de IA.</p>
+                </div>
+
+                <div class="dashboard-grid">
+                    <!-- Tarjeta de creación de proyecto -->
+                    <div class="glass-card new-project-card">
+                        <div class="card-header">
+                            <i class="fa-solid fa-wand-magic-sparkles spark-icon"></i>
+                            <h2>Iniciar Nuevo Proyecto</h2>
+                        </div>
+                        <div class="card-body">
+                            <div class="form-group">
+                                <label for="project-name-input">Nombre del Proyecto</label>
+                                <input type="text" id="project-name-input" placeholder="Ej: TaskFlow, FitLife App, PayBlock...">
+                            </div>
+                            <div class="form-group">
+                                <label for="project-seed-idea">Describe tu idea en una frase</label>
+                                <textarea id="project-seed-idea" placeholder="Ej: Quiero una aplicación móvil para que usuarios puedan registrar sus entrenamientos diarios y competir en tablas de posiciones..."></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label>Plantillas y Presets</label>
+                                <div class="preset-chips">
+                                    <div class="preset-chip active" data-preset="saas">SaaS / Web App</div>
+                                    <div class="preset-chip" data-preset="api">API REST / Microservicio</div>
+                                    <div class="preset-chip" data-preset="mobile">Mobile App</div>
+                                    <div class="preset-chip" data-preset="ia">IA Agent / RAG Tool</div>
+                                </div>
+                            </div>
+                            <button id="start-discovery-btn" class="btn btn-primary btn-full-width">
+                                <span>Iniciar Descubrimiento con Gemini</span>
+                                <i class="fa-solid fa-arrow-right"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Tarjeta de proyectos recientes -->
+                    <div class="glass-card recent-projects-card">
+                        <div class="card-header">
+                            <i class="fa-solid fa-folder-open folder-icon"></i>
+                            <h2>Proyecto en Curso</h2>
+                        </div>
+                        <div class="card-body" id="recent-projects-list">
+                            <!-- Estado vacío o proyecto actual cargado de project.json -->
+                            <div class="empty-projects-state">
+                                <i class="fa-solid fa-diagram-project"></i>
+                                <p>No hay proyectos activos cargados. <br>Inicia uno nuevo para comenzar.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- PANTALLA 2: WIZARD DE DESCUBRIMIENTO -->
+            <section id="screen-discovery" class="screen">
+                <div class="discovery-layout">
+                    <div class="discovery-left">
+                        <div class="discovery-header">
+                            <button class="btn-back" id="back-to-dashboard-btn">
+                                <i class="fa-solid fa-arrow-left"></i> Volver al Inicio
+                            </button>
+                            <h2>Entrevista de Descubrimiento</h2>
+                            <p>Gemini está analizando tu idea para formular preguntas inteligentes que den forma al software.</p>
+                        </div>
+
+                        <!-- Cargador animado -->
+                        <div class="discovery-loader" id="discovery-loader">
+                            <div class="spinner"></div>
+                            <p id="loader-status-text">Analizando idea y abstrayendo dominio...</p>
+                        </div>
+
+                        <!-- Preguntas del Wizard -->
+                        <div class="wizard-container hidden" id="wizard-container">
+                            <div class="wizard-progress-bar">
+                                <div class="wizard-progress-track">
+                                    <div class="wizard-progress-fill" id="wizard-progress-fill" style="width: 20%"></div>
+                                </div>
+                                <span id="wizard-step-indicator">Pregunta 1 de 5</span>
+                            </div>
+
+                            <div class="question-card" id="active-question-card">
+                                <span class="question-category" id="question-category">Arquitectura</span>
+                                <h3 id="question-text">¿Qué tipo de base de datos prefieres usar?</h3>
+                                
+                                <div class="answer-input-container" id="answer-input-container">
+                                    <!-- Los inputs dinámicos se inyectarán aquí -->
+                                </div>
+                                
+                                <div class="wizard-actions">
+                                    <button class="btn btn-secondary" id="wizard-prev-btn" disabled>Anterior</button>
+                                    <button class="btn btn-primary" id="wizard-next-btn">Siguiente <i class="fa-solid fa-chevron-right"></i></button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="discovery-right">
+                        <!-- Panel de análisis conceptual actual -->
+                        <div class="glass-card conceptual-analysis-card">
+                            <h3>Mapa Conceptual del Producto</h3>
+                            <div class="metadata-analysis-list">
+                                <div class="meta-item">
+                                    <span class="meta-label">Dominio:</span>
+                                    <span class="meta-val" id="meta-domain">-</span>
+                                </div>
+                                <div class="meta-item">
+                                    <span class="meta-label">Tipo:</span>
+                                    <span class="meta-val" id="meta-type">-</span>
+                                </div>
+                                <div class="meta-item">
+                                    <span class="meta-label">Actores Clave:</span>
+                                    <div class="meta-chips" id="meta-actors">
+                                        <!-- Chips de actores -->
+                                    </div>
+                                </div>
+                                <div class="meta-item">
+                                    <span class="meta-label">Funcionalidades Core:</span>
+                                    <ul class="meta-list" id="meta-features">
+                                        <!-- Lista de funcionalidades -->
+                                    </ul>
+                                </div>
+                            </div>
+                            <button id="skip-to-workspace-btn" class="btn btn-border btn-full-width">
+                                <i class="fa-solid fa-rocket"></i> Saltar al Workspace
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- PANTALLA 3: WORKSPACE IDE (EL NÚCLEO) -->
+            <section id="screen-workspace" class="screen">
+                <div class="workspace-layout">
+                    
+                    <!-- PANEL IZQUIERDO: ÁRBOL DE MÓDULOS SPEC -->
+                    <aside class="workspace-sidebar">
+                        <div class="sidebar-header">
+                            <h3>Estructura de Specs</h3>
+                            <button id="btn-export-specs" class="btn btn-primary btn-sm" title="Escribir archivos Markdown en carpeta local /specs">
+                                <i class="fa-solid fa-file-export"></i> Exportar
+                            </button>
+                        </div>
+                        <nav class="spec-tree" id="spec-tree-nav">
+                            <!-- Los archivos de especificación se inyectan aquí dinámicamente -->
+                        </nav>
+                    </aside>
+
+                    <!-- PANEL CENTRAL: EDITOR Y DETALLE -->
+                    <section class="workspace-editor-panel">
+                        <div class="editor-header">
+                            <div class="editor-title-group">
+                                <i class="fa-regular fa-file-code active-file-icon"></i>
+                                <h2 id="active-spec-title">product.md</h2>
+                            </div>
+                            <div class="editor-actions">
+                                <button id="btn-ai-autocomplete" class="btn btn-border btn-sm" title="Autocompletar contenido con Gemini">
+                                    <i class="fa-solid fa-wand-magic-sparkles"></i> Completar con IA
+                                </button>
+                                <button id="btn-save-project-manual" class="btn btn-border btn-sm" title="Guardar estado del proyecto">
+                                    <i class="fa-solid fa-cloud-arrow-up"></i> Guardar
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="editor-workspace">
+                            <!-- Pestañas de edición / visualización -->
+                            <div class="editor-tabs">
+                                <button class="editor-tab active" data-view="form">Respuestas Guía</button>
+                                <button class="editor-tab" data-view="markdown">Visualizar Markdown</button>
+                            </div>
+
+                            <!-- VISTA 1: FORMULARIO RESPUESTAS GUÍA -->
+                            <div id="editor-view-form" class="editor-tab-content active">
+                                <div class="form-guidelines" id="active-spec-form-container">
+                                    <!-- Cuestionario y campos de edición adaptativos para el archivo activo -->
+                                </div>
+                            </div>
+
+                            <!-- VISTA 2: MARKDOWN PREVIEW / EDITOR -->
+                            <div id="editor-view-markdown" class="editor-tab-content">
+                                <div class="markdown-preview-container">
+                                    <textarea id="markdown-raw-editor" class="markdown-editor" placeholder="Cargando contenido en Markdown..."></textarea>
+                                    <div class="markdown-preview-pane" id="markdown-preview-pane">
+                                        <!-- Markdown renderizado como HTML -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- PANEL DERECHO: INSPECTOR, DIAGRAMAS Y COPILOTO -->
+                    <aside class="workspace-inspector">
+                        <div class="inspector-tabs">
+                            <button class="inspector-tab active" data-tab="diagrams"><i class="fa-solid fa-diagram-project"></i> Diagramas</button>
+                            <button class="inspector-tab" data-tab="linter"><i class="fa-solid fa-triangle-exclamation"></i> Linter IA</button>
+                            <button class="inspector-tab" data-tab="chat"><i class="fa-solid fa-robot"></i> Copiloto</button>
+                        </div>
+
+                        <div class="inspector-content">
+                            <!-- Pestaña 1: Diagramas Mermaid -->
+                            <div id="inspector-tab-diagrams" class="inspector-tab-content active">
+                                <div class="diagram-controls">
+                                    <select id="diagram-type-select">
+                                        <option value="er">Entidad Relación (BD)</option>
+                                        <option value="flow">Flujo de Usuario</option>
+                                        <option value="architecture">Arquitectura Técnica</option>
+                                    </select>
+                                    <button id="btn-regenerate-diagram" class="btn btn-border btn-sm"><i class="fa-solid fa-rotate"></i> Regenerar</button>
+                                </div>
+                                <div class="diagram-viewer" id="mermaid-diagram-viewer">
+                                    <div class="empty-diagram-state">
+                                        <i class="fa-solid fa-crop-simple"></i>
+                                        <p>Haz clic en "Regenerar" para crear el diagrama usando IA.</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Pestaña 2: Linter de consistencia -->
+                            <div id="inspector-tab-linter" class="inspector-tab-content">
+                                <div class="linter-header">
+                                    <h3>Consola de Inconsistencias</h3>
+                                    <button id="btn-run-linter" class="btn btn-primary btn-sm"><i class="fa-solid fa-shield-halved"></i> Validar Spec</button>
+                                </div>
+                                <div class="linter-list" id="linter-warnings-list">
+                                    <div class="empty-linter-state">
+                                        <i class="fa-solid fa-circle-check"></i>
+                                        <p>No se han corrido validaciones de consistencia aún.</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Pestaña 3: Chat Copiloto -->
+                            <div id="inspector-tab-chat" class="inspector-tab-content">
+                                <div class="chat-container">
+                                    <div class="chat-messages" id="chat-messages-container">
+                                        <div class="chat-message ai">
+                                            <p>¡Hola! Soy tu Copiloto de Especificaciones. Puedo ayudarte a refinar la arquitectura, proponer endpoints, modelar bases de datos o redactar historias de usuario. ¿Qué quieres diseñar hoy?</p>
+                                        </div>
+                                    </div>
+                                    <div class="chat-input-area">
+                                        <textarea id="chat-user-input" placeholder="Pregunta sobre la spec... (ej: 'Sugiéreme campos para la tabla cursos')"></textarea>
+                                        <button id="chat-send-btn" class="btn btn-primary"><i class="fa-solid fa-paper-plane"></i></button>
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+                    </aside>
+
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- Notificaciones flotantes -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>
