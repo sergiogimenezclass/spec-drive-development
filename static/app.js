@@ -24,7 +24,8 @@ const state = {
     activeQuestionIndex: 0,
     isDarkTheme: true,
     hasBackendApiKey: false,
-    generationPath: 'guided'
+    generationPath: 'guided',
+    dynamicRounds: 0
 };
 
 // Estructura fija de los 16 archivos de la spec
@@ -230,6 +231,7 @@ function setupEventListeners() {
     // Wizard: Siguiente y Anterior
     document.getElementById('wizard-next-btn').addEventListener('click', handleWizardNext);
     document.getElementById('wizard-prev-btn').addEventListener('click', handleWizardPrev);
+    document.getElementById('wizard-finish-btn').addEventListener('click', finishInterviewAndGenerateSpecs);
 
     // Exportar Specs
     document.getElementById('btn-export-specs').addEventListener('click', exportSpecsToDisk);
@@ -478,6 +480,7 @@ async function startDiscoveryFlow() {
             updateConceptualAnalysisPanel();
             
             // Iniciar Wizard
+            state.dynamicRounds = 0;
             state.activeQuestionIndex = 0;
             document.getElementById('discovery-loader').classList.add('hidden');
             document.getElementById('wizard-container').classList.remove('hidden');
@@ -513,7 +516,9 @@ function renderWizardQuestion() {
     }
     
     const q = state.questionTree[state.activeQuestionIndex];
-    document.getElementById('wizard-step-indicator').innerText = `Pregunta ${state.activeQuestionIndex + 1} de ${state.questionTree.length}`;
+    const isDynamic = state.dynamicRounds > 0;
+    const phaseLabel = isDynamic ? "Fase 2: Refinamiento Técnico de IA" : "Fase 1: Descubrimiento de Negocio";
+    document.getElementById('wizard-step-indicator').innerText = `[${phaseLabel}] Pregunta ${state.activeQuestionIndex + 1} de ${state.questionTree.length}`;
     document.getElementById('wizard-progress-fill').style.width = `${((state.activeQuestionIndex + 1) / state.questionTree.length) * 100}%`;
     
     document.getElementById('question-category').innerText = q.section;
@@ -588,6 +593,14 @@ function handleWizardPrev() {
 
 // Solicitar preguntas secundarias a Gemini
 async function requestAdditionalQuestions() {
+    if ((state.dynamicRounds || 0) >= 1) {
+        // Ya completamos la ronda técnica dinámica, terminamos la entrevista y redactamos
+        await finishInterviewAndGenerateSpecs();
+        return;
+    }
+    
+    state.dynamicRounds = (state.dynamicRounds || 0) + 1;
+    
     document.getElementById('discovery-loader').classList.remove('hidden');
     document.getElementById('wizard-container').classList.add('hidden');
     document.getElementById('loader-status-text').innerText = "Generando preguntas técnicas específicas...";
@@ -615,11 +628,58 @@ async function requestAdditionalQuestions() {
             document.getElementById('wizard-container').classList.remove('hidden');
             renderWizardQuestion();
         } else {
-            // No hay más preguntas, saltamos al Workspace
+            // No hay más preguntas, finalizamos y redactamos
+            await finishInterviewAndGenerateSpecs();
+        }
+    } catch (e) {
+        console.error(e);
+        await finishInterviewAndGenerateSpecs();
+    }
+}
+
+// Finalizar entrevista guiada y disparar generación completa de specs
+async function finishInterviewAndGenerateSpecs() {
+    // Si no ha contestado nada, mostramos aviso
+    const answeredCount = Object.keys(state.currentProject.answers).length;
+    if (answeredCount === 0) {
+        showToast("Por favor responde al menos una pregunta para poder generar las especificaciones", "info");
+        return;
+    }
+    
+    showScreen('screen-discovery');
+    document.getElementById('discovery-loader').classList.remove('hidden');
+    document.getElementById('wizard-container').classList.add('hidden');
+    document.getElementById('loader-status-text').innerText = "Gemini está redactando todas tus especificaciones a partir de tus respuestas...";
+    
+    await saveProjectToServer();
+    
+    try {
+        const exportResponse = await fetch('/api/export-specs', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Gemini-Key': state.apiKey
+            },
+            body: JSON.stringify({ project_data: state.currentProject })
+        });
+        
+        const exportData = await exportResponse.json();
+        if (exportData.status === 'success') {
+            const loadResp = await fetch('/api/load-project');
+            const loadData = await loadResp.json();
+            
+            if (loadData.status === 'success' && loadData.project) {
+                state.currentProject = loadData.project;
+            }
+            showToast("Especificaciones redactadas con éxito basándose en tu entrevista", "success");
+            loadWorkspace();
+        } else {
+            showToast("Hubo un error al generar las especificaciones, ingresando al Workspace.", "error");
             loadWorkspace();
         }
     } catch (e) {
         console.error(e);
+        showToast("Error de conexión al redactar especificaciones. Redirigiendo al Workspace.", "error");
         loadWorkspace();
     }
 }

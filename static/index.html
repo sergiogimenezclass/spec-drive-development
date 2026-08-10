@@ -181,9 +181,14 @@
                                     <!-- Los inputs dinámicos se inyectarán aquí -->
                                 </div>
                                 
-                                <div class="wizard-actions">
-                                    <button class="btn btn-secondary" id="wizard-prev-btn" disabled>Anterior</button>
-                                    <button class="btn btn-primary" id="wizard-next-btn">Siguiente <i class="fa-solid fa-chevron-right"></i></button>
+                                <div class="wizard-actions" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                                    <button class="btn btn-border btn-sm" id="wizard-finish-btn" style="margin-right: auto;" title="Generar especificaciones técnicas con las respuestas dadas hasta ahora">
+                                        <i class="fa-solid fa-flag-checkered"></i> Finalizar y Generar
+                                    </button>
+                                    <div style="display: flex; gap: 8px;">
+                                        <button class="btn btn-secondary" id="wizard-prev-btn" disabled>Anterior</button>
+                                        <button class="btn btn-primary" id="wizard-next-btn">Siguiente <i class="fa-solid fa-chevron-right"></i></button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
