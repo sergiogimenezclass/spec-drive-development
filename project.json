@@ -1,0 +1,38 @@
+{
+  "id": "proj_yizm2r1qt",
+  "name": "turnos",
+  "seedIdea": "sistema de turnos para un solo medico",
+  "createdAt": 1783465261229,
+  "updatedAt": 1783465330208,
+  "answers": {},
+  "specModules": {
+    "project": "# Ficha Técnica del Proyecto: turnos\n \n ## Información General\n *   **Idea Semilla:** sistema de turnos para un solo medico\n *   **Dominio:** Por definir\n *   **Tipo de Producto:** Web App\n *   **Actores Detectados:** Usuario final, Administrador\n \n ## Resumen de Respuestas clave\n \n \n ---\n *Documento generado automáticamente por [Spec IDE](file:///home/sergio/Documents/src/programador 2026/spect-first/app.py).*",
+    "product": "# Especificación: Product\n\nContenido pendiente de refinamiento por el usuario.",
+    "requirements": "# Requisitos Funcionales y No Funcionales\n \n ## Requisitos Funcionales (RF)\n A partir de la idea: *sistema de turnos para un solo medico*\n *   **RF-01 (Autenticación):** El sistema debe permitir a los actores (Usuario final, Administrador) iniciar sesión de forma segura.\n *   **RF-02 (Core):** El sistema debe resolver la problemática central: \"sistema de turnos para un solo medico\".\n *   **RF-03 (Administración):** Se debe proveer un panel de control para gestionar recursos.\n \n ## Requisitos No Funcionales (RNF)\n *   **RNF-01 (Seguridad):** Cifrado de datos en tránsito (TLS/HTTPS).\n *   **RNF-02 (Rendimiento):** Tiempos de respuesta del backend inferiores a 300ms para endpoints CRUD.\n *   **RNF-03 (Usabilidad):** Interfaz fluida y accesible que cumpla con los estándares WCAG 2.1 AA.",
+    "user-stories": "# Historias de Usuario (Specs)\n \n ## Historia 1: Acceso al Sistema\n **Como** Usuario final  \n **Quiero** ingresar con mis credenciales al sistema  \n **Para** poder acceder a mis recursos privados.\n \n *   **Criterio de Aceptación 1:** Dado un usuario no registrado, cuando intenta ingresar, el sistema debe mostrar un error de credenciales.\n *   **Criterio de Aceptación 2:** Dado un usuario registrado, cuando ingresa credenciales válidas, es redirigido al panel de control.\n \n ## Historia 2: Ejecución del Core\n **Como** Usuario final  \n **Quiero** interactuar con la funcionalidad principal del software  \n **Para** resolver mi necesidad de negocio.",
+    "architecture": "# Especificación: Architecture\n\nContenido pendiente de refinamiento por el usuario.",
+    "database": "# Especificación: Database\n\nContenido pendiente de refinamiento por el usuario.",
+    "api": "# Especificación: Api\n\nContenido pendiente de refinamiento por el usuario.",
+    "frontend": "# Especificación Frontend\n \n ## Vistas del Sistema\n 1.  **Vista de Autenticación (Login):** Formulario limpio y accesible.\n 2.  **Dashboard Principal:** Vista de datos generales y accesos rápidos.\n 3.  **Detalle del Core:** Interfaz para interactuar con la lógica principal.\n \n ## Estándares de Estilo\n *   **Tema:** Soporte de tema oscuro/claro.\n *   **Alineación:** Diseño fluido y mobile-first.",
+    "backend": "# Especificación Backend\n \n ## Componentes y Servicios\n *   **Servicio de API REST:** Procesa las solicitudes del frontend.\n *   **Módulo de Base de Datos:** Capa de acceso a datos (ORM o consultas optimizadas).\n *   **Capa de Autenticación:** Validación de tokens JWT / Sesiones.",
+    "security": "# Políticas de Seguridad y Roles\n \n ## Matriz de Control de Acceso (RBAC)\n *   **Roles:** Usuario final, Administrador\n *   **Políticas:**\n     *   Cada rol tiene permisos limitados a sus propios recursos.\n     *   Los administradores pueden gestionar todos los recursos.",
+    "integrations": "# Integraciones con Servicios de Terceros\n \n ## Servicios Identificados\n *   **IA / LLM:** Google Gemini API (para flujos asistidos).\n *   **Otros servicios:** A definir en las fases de desarrollo avanzadas.",
+    "roadmap": "# Planificación de Fases y Roadmap\n \n ## Fase 1: Producto Mínimo Viable (MVP)\n *   Implementación del núcleo de la idea: \"sistema de turnos para un solo medico\"\n *   Autenticación básica de usuarios.\n \n ## Fase 2: Robustez y Escalabilidad (V1)\n *   Integraciones avanzadas de seguridad y analíticas.\n *   Optimización de base de datos.",
+    "tasks": "# Lista de Tareas de Desarrollo (TODOs)\n \n - [ ] **Configurar Base de Datos** e infraestructura inicial.\n - [ ] **Implementar Autenticación** y manejo de sesiones.\n - [ ] **Desarrollar el Flujo Principal** para: *sistema de turnos para un solo medico*.\n - [ ] **Realizar Pruebas de Integración** y QA.",
+    "decisions": "# Registro de Decisiones de Arquitectura (ADR)\n \n ## ADR-01: Uso de API de Gemini para Refinamiento\n *   **Estatus:** Aceptado\n *   **Contexto:** Necesitamos un descubrimiento inteligente de requisitos.\n *   **Decisión:** Integrar Gemini para generar preguntas condicionales y pre-escribir las specs.\n *   **Consecuencias:** Mayor velocidad de diseño y consistencia técnica inicial.",
+    "glossary": "# Glosario de Términos\n \n *   **MVP:** Minimum Viable Product (Producto Mínimo Viable).\n *   **Spec IDE:** Entorno de especificaciones técnicas interactivas.\n *   **SSOT:** Single Source of Truth (Fuente única de verdad).",
+    "agents": "# Instrucciones para Agentes de Código (System Prompts)\n \n Este archivo sirve como prompt del sistema para herramientas como Cursor, Cline, Aider o Roo Code.\n \n ```text\n Actúa como un desarrollador experto que va a implementar el proyecto.\n Tu fuente única de verdad es la carpeta /specs del proyecto.\n No escribas código que contradiga las definiciones en:\n - architecture.md\n - database.md\n - api.md\n ```"
+  },
+  "metadata": {
+    "domain": "Por definir",
+    "productType": "Web App",
+    "actors": [
+      "Usuario final",
+      "Administrador"
+    ],
+    "features": [
+      "Inicio de sesión",
+      "Gestión básica"
+    ]
+  }
+}
