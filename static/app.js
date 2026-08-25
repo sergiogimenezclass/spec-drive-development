@@ -259,36 +259,8 @@ function setupEventListeners() {
     document.getElementById('btn-start-planning-analysis').addEventListener('click', runPlanningAnalysis);
     document.getElementById('btn-submit-generation').addEventListener('click', submitFeatureGeneration);
 
-    // Guardar Manual en Workspace
-    document.getElementById('btn-save-project-manual').addEventListener('click', saveProjectToServer);
-
     // Completar con IA en el editor
     document.getElementById('btn-ai-autocomplete').addEventListener('click', autocompleteActiveSection);
-
-    // Alternar modo de edición de Markdown
-    document.getElementById('btn-toggle-edit-mode').addEventListener('click', () => {
-        const container = document.querySelector('.markdown-preview-container');
-        const btn = document.getElementById('btn-toggle-edit-mode');
-        
-        const isEditing = container.classList.toggle('edit-mode');
-        if (isEditing) {
-            btn.innerHTML = '<i class="fa-solid fa-eye"></i> Visualizar';
-            btn.style.borderColor = 'var(--primary-color)';
-            btn.style.color = 'var(--primary-color)';
-        } else {
-            btn.innerHTML = '<i class="fa-solid fa-pencil"></i> Editar';
-            btn.style.borderColor = '';
-            btn.style.color = '';
-        }
-    });
-
-    // Sincronizar edición manual de Markdown con respuestas del proyecto
-    document.getElementById('markdown-raw-editor').addEventListener('input', (e) => {
-        const text = e.target.value;
-        renderMarkdownHTML(text);
-        // Guardamos temporalmente en el estado
-        state.currentProject.specModules[state.activeSpecFile.replace('.md', '').replace('.json', '')] = text;
-    });
 
     // Pestañas del Inspector (Diagramas, Linter, Chat)
     const inspectorTabs = document.querySelectorAll('.inspector-tab');
@@ -769,7 +741,6 @@ function renderSpecTree() {
 }
 
 // Seleccionar archivo activo en el IDE
-// Seleccionar archivo activo en el IDE
 function selectSpecFile(filename) {
     state.activeSpecFile = filename;
     document.getElementById('active-spec-title').innerText = filename;
@@ -777,23 +748,10 @@ function selectSpecFile(filename) {
     // Cambiar clase activa en el árbol
     renderSpecTree();
     
-    // Cargar contenido Markdown en el editor raw
+    // Cargar contenido Markdown y renderizarlo
     const moduleName = filename.replace('.md', '').replace('.json', '');
     const mdContent = (state.currentProject.specModules && state.currentProject.specModules[moduleName]) || '';
-    document.getElementById('markdown-raw-editor').value = mdContent;
     renderMarkdownHTML(mdContent);
-}
-
-// Actualizar la pestaña de Markdown Preview
-function updateMarkdownPreview() {
-    const filename = state.activeSpecFile;
-    const moduleName = filename.replace('.md', '').replace('.json', '');
-    const currentText = document.getElementById('markdown-raw-editor').value;
-    
-    state.currentProject.specModules = state.currentProject.specModules || {};
-    state.currentProject.specModules[moduleName] = currentText;
-    
-    renderMarkdownHTML(currentText);
 }
 
 // Parser Markdown utilizando la librería Marked.js para previsualización HTML completa
@@ -862,7 +820,6 @@ async function autocompleteActiveSection() {
         if (data.status === 'success' && data.project) {
             state.currentProject = data.project;
             const mdContent = state.currentProject.specModules[moduleName] || '';
-            document.getElementById('markdown-raw-editor').value = mdContent;
             renderMarkdownHTML(mdContent);
             showToast(`${filename} redactado con éxito`, "success");
             updateGlobalProgressBar();

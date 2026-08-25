@@ -261,27 +261,16 @@
                                 <h2 id="active-spec-title">product.md</h2>
                             </div>
                             <div class="editor-actions">
-                                <button id="btn-toggle-edit-mode" class="btn btn-border btn-sm" title="Alternar entre lectura y edición de código">
-                                    <i class="fa-solid fa-pencil"></i> Editar
-                                </button>
                                 <button id="btn-ai-autocomplete" class="btn btn-border btn-sm" title="Autocompletar contenido con Gemini">
                                     <i class="fa-solid fa-wand-magic-sparkles"></i> Completar con IA
-                                </button>
-                                <button id="btn-save-project-manual" class="btn btn-border btn-sm" title="Guardar estado del proyecto">
-                                    <i class="fa-solid fa-cloud-arrow-up"></i> Guardar
                                 </button>
                             </div>
                         </div>
 
                         <div class="editor-workspace">
-                            <!-- VISTA ÚNICA: MARKDOWN PREVIEW / EDITOR -->
-                            <div id="editor-view-markdown" class="editor-tab-content active" style="flex: 1; display: flex; flex-direction: column; height: 100%;">
-                                <div class="markdown-preview-container">
-                                    <textarea id="markdown-raw-editor" class="markdown-editor" placeholder="Cargando contenido en Markdown..."></textarea>
-                                    <div class="markdown-preview-pane" id="markdown-preview-pane">
-                                        <!-- Markdown renderizado como HTML -->
-                                    </div>
-                                </div>
+                            <!-- VISTA DE PREVISUALIZACIÓN -->
+                            <div class="markdown-preview-pane" id="markdown-preview-pane" style="flex: 1; height: 100%; border: 1px solid var(--border-color); border-radius: 8px; padding: 20px; background-color: rgba(255, 255, 255, 0.02); overflow-y: auto; line-height: 1.6;">
+                                <!-- Markdown renderizado como HTML -->
                             </div>
                         </div>
                     </section>
@@ -412,6 +401,6 @@
     <!-- Notificaciones flotantes -->
     <div id="toast-container" class="toast-container"></div>
 
-    <script src="app.js?v=2.0.3"></script>
+    <script src="app.js?v=2.0.4"></script>
 </body>
 </html>
