@@ -269,10 +269,35 @@ async def check_consistency(req: SaveProjectRequest, x_gemini_key: str = Header(
 
 @app.post("/api/save-project")
 async def save_project(req: SaveProjectRequest):
+    project_data = req.project_data
     try:
+        # 1. Guardar el estado general del proyecto en project.json
         with open(PROJECT_FILE, "w", encoding="utf-8") as f:
-            json.dump(req.project_data, f, ensure_ascii=False, indent=2)
-        return {"status": "success", "message": "Proyecto guardado localmente"}
+            json.dump(project_data, f, ensure_ascii=False, indent=2)
+            
+        # 2. Sincronizar hacia los archivos individuales en el disco (specs/ y features/)
+        spec_modules = project_data.get("specModules", {})
+        if os.path.exists(SPECS_DIR):
+            for name_key, content in spec_modules.items():
+                if not content:
+                    continue
+                # Si es una feature dinámica (ej. features/auth/login)
+                if name_key.startswith("features/"):
+                    filepath = os.path.join(SPECS_DIR, f"{name_key}.md")
+                else:
+                    # Guardamos openapi como .json y el resto como .md
+                    ext = ".json" if name_key == "openapi" else ".md"
+                    filepath = os.path.join(SPECS_DIR, f"{name_key}{ext}")
+                
+                # Asegurar que existan los directorios
+                os.makedirs(os.path.dirname(filepath), exist_ok=True)
+                try:
+                    with open(filepath, "w", encoding="utf-8") as file_obj:
+                        file_obj.write(content.strip())
+                except Exception as file_err:
+                    logger.error(f"Error escribiendo archivo individual {name_key} en save_project: {str(file_err)}")
+                    
+        return {"status": "success", "message": "Proyecto y archivos físicos guardados localmente"}
     except Exception as e:
         logger.error(f"Error al guardar proyecto: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
