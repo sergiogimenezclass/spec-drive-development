@@ -275,62 +275,31 @@
                         </div>
                     </section>
 
-                    <!-- PANEL DERECHO: INSPECTOR, DIAGRAMAS Y COPILOTO -->
+                    <!-- PANEL DERECHO: DIAGRAMAS -->
                     <aside class="workspace-inspector">
-                        <div class="inspector-tabs">
-                            <button class="inspector-tab active" data-tab="diagrams"><i class="fa-solid fa-diagram-project"></i> Diagramas</button>
-                            <button class="inspector-tab" data-tab="linter"><i class="fa-solid fa-triangle-exclamation"></i> Linter IA</button>
-                            <button class="inspector-tab" data-tab="chat"><i class="fa-solid fa-robot"></i> Copiloto</button>
+                        <div class="inspector-header-simple" style="padding: 16px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; gap: 8px;">
+                            <i class="fa-solid fa-diagram-project" style="color: var(--primary-color);"></i>
+                            <h3 style="font-family: var(--font-title); font-size: 14px; margin: 0; font-weight: 600;">Diagramas Mermaid</h3>
                         </div>
 
                         <div class="inspector-content">
-                            <!-- Pestaña 1: Diagramas Mermaid -->
-                            <div id="inspector-tab-diagrams" class="inspector-tab-content active">
+                            <!-- Pestaña Única: Diagramas Mermaid -->
+                            <div id="inspector-tab-diagrams" class="inspector-tab-content active" style="padding: 16px; display: flex; flex-direction: column; gap: 16px; height: calc(100% - 50px); overflow-y: auto;">
                                 <div class="diagram-controls">
                                     <select id="diagram-type-select">
                                         <option value="er">Entidad Relación (BD)</option>
                                         <option value="flow">Flujo de Usuario</option>
                                         <option value="architecture">Arquitectura Técnica</option>
                                     </select>
-                                    <button id="btn-regenerate-diagram" class="btn btn-border btn-sm"><i class="fa-solid fa-rotate"></i> Regenerar</button>
+                                    <button id="btn-regenerate-diagram" class="btn btn-border btn-sm"><i class="fa-solid fa-rotate"></i> Generar</button>
                                 </div>
                                 <div class="diagram-viewer" id="mermaid-diagram-viewer">
                                     <div class="empty-diagram-state">
                                         <i class="fa-solid fa-crop-simple"></i>
-                                        <p>Haz clic en "Regenerar" para crear el diagrama usando IA.</p>
+                                        <p>Haz clic en "Generar" para crear el diagrama usando IA.</p>
                                     </div>
                                 </div>
                             </div>
-
-                            <!-- Pestaña 2: Linter de consistencia -->
-                            <div id="inspector-tab-linter" class="inspector-tab-content">
-                                <div class="linter-header">
-                                    <h3>Consola de Inconsistencias</h3>
-                                    <button id="btn-run-linter" class="btn btn-primary btn-sm"><i class="fa-solid fa-shield-halved"></i> Validar Spec</button>
-                                </div>
-                                <div class="linter-list" id="linter-warnings-list">
-                                    <div class="empty-linter-state">
-                                        <i class="fa-solid fa-circle-check"></i>
-                                        <p>No se han corrido validaciones de consistencia aún.</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Pestaña 3: Chat Copiloto -->
-                            <div id="inspector-tab-chat" class="inspector-tab-content">
-                                <div class="chat-container">
-                                    <div class="chat-messages" id="chat-messages-container">
-                                        <div class="chat-message ai">
-                                            <p>¡Hola! Soy tu Copiloto de Especificaciones. Puedo ayudarte a refinar la arquitectura, proponer endpoints, modelar bases de datos o redactar historias de usuario. ¿Qué quieres diseñar hoy?</p>
-                                        </div>
-                                    </div>
-                                    <div class="chat-input-area">
-                                        <textarea id="chat-user-input" placeholder="Pregunta sobre la spec... (ej: 'Sugiéreme campos para la tabla cursos')"></textarea>
-                                        <button id="chat-send-btn" class="btn btn-primary"><i class="fa-solid fa-paper-plane"></i></button>
-                                    </div>
-                                </div>
-                            </div>
-
                         </div>
                     </aside>
 
@@ -401,6 +370,6 @@
     <!-- Notificaciones flotantes -->
     <div id="toast-container" class="toast-container"></div>
 
-    <script src="app.js?v=2.0.4"></script>
+    <script src="app.js?v=2.0.5"></script>
 </body>
 </html>
