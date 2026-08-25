@@ -796,7 +796,7 @@ function updateMarkdownPreview() {
     renderMarkdownHTML(currentText);
 }
 
-// Parser Markdown sumamente simple para previsualización HTML
+// Parser Markdown utilizando la librería Marked.js para previsualización HTML completa
 function renderMarkdownHTML(md) {
     const pane = document.getElementById('markdown-preview-pane');
     if (!md) {
@@ -814,25 +814,23 @@ function renderMarkdownHTML(md) {
         return;
     }
     
-    // Reemplazo básico de etiquetas Markdown
-    let html = md
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/^# (.*$)/gim, '<h1>$1</h1>')
-        .replace(/^## (.*$)/gim, '<h2>$1</h2>')
-        .replace(/^### (.*$)/gim, '<h3>$1</h3>')
-        .replace(/^\* (.*$)/gim, '<li>$1</li>')
-        .replace(/^- (.*$)/gim, '<li>$1</li>')
-        .replace(/\*\*(.*)\*\*/gim, '<strong>$1</strong>')
-        .replace(/\*(.*)\*/gim, '<em>$1</em>')
-        .replace(/`([^`]+)`/gim, '<code>$1</code>')
-        .replace(/\n$/gim, '<br>');
-
-    // Agrupar elementos li en ul
-    html = html.replace(/(<li>.*<\/li>)/gim, '<ul>$1</ul>');
-    
-    pane.innerHTML = html;
+    try {
+        // Permitimos saltos de línea y formateo GFM nativo (Tablas, etc)
+        marked.setOptions({
+            breaks: true,
+            gfm: true
+        });
+        pane.innerHTML = marked.parse(md);
+    } catch (e) {
+        console.error("Error parsing with marked.js:", e);
+        // Fallback simple si la CDN no carga
+        let html = md
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/\n/g, '<br>');
+        pane.innerHTML = html;
+    }
 }
 
 // Completar la sección activa usando Gemini

@@ -1556,3 +1556,24 @@ body {
 @keyframes spin {
     to { transform: rotate(360deg); }
 }
+
+/* Tablas formateadas en previsualización */
+.markdown-preview-pane table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 13px;
+}
+.markdown-preview-pane th, .markdown-preview-pane td {
+    border: 1px solid var(--border-color);
+    padding: 8px 12px;
+    text-align: left;
+}
+.markdown-preview-pane th {
+    background-color: rgba(255, 255, 255, 0.05);
+    font-weight: 600;
+    color: var(--text-primary);
+}
+.markdown-preview-pane tr:nth-child(even) {
+    background-color: rgba(255, 255, 255, 0.01);
+}
