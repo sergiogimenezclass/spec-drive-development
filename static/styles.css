@@ -786,6 +786,7 @@ body {
     border-right: var(--glass-border);
     display: flex;
     flex-direction: column;
+    height: 100%;
 }
 .sidebar-header {
     padding: 16px 20px;
