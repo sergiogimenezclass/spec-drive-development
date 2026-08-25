@@ -991,6 +991,7 @@ async def autocomplete_file(req: AutocompleteFileRequest, x_gemini_key: str = He
 
 @app.post("/api/open-specs-folder")
 async def open_specs_folder():
+    import os
     import platform
     import shutil
     import subprocess
@@ -1017,7 +1018,6 @@ async def open_specs_folder():
         if system_name == "Darwin": # macOS
             subprocess.Popen(["open", dir_path])
         elif system_name == "Windows":
-            import os
             os.startfile(dir_path)
         else: # Linux y otros
             subprocess.Popen(["xdg-open", dir_path])
