@@ -265,7 +265,22 @@ function setupEventListeners() {
     // Completar con IA en el editor
     document.getElementById('btn-ai-autocomplete').addEventListener('click', autocompleteActiveSection);
 
-    // Pestañas del Editor eliminadas para simplificar el flujo
+    // Alternar modo de edición de Markdown
+    document.getElementById('btn-toggle-edit-mode').addEventListener('click', () => {
+        const container = document.querySelector('.markdown-preview-container');
+        const btn = document.getElementById('btn-toggle-edit-mode');
+        
+        const isEditing = container.classList.toggle('edit-mode');
+        if (isEditing) {
+            btn.innerHTML = '<i class="fa-solid fa-eye"></i> Visualizar';
+            btn.style.borderColor = 'var(--primary-color)';
+            btn.style.color = 'var(--primary-color)';
+        } else {
+            btn.innerHTML = '<i class="fa-solid fa-pencil"></i> Editar';
+            btn.style.borderColor = '';
+            btn.style.color = '';
+        }
+    });
 
     // Sincronizar edición manual de Markdown con respuestas del proyecto
     document.getElementById('markdown-raw-editor').addEventListener('input', (e) => {

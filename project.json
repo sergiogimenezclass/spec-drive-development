@@ -3,7 +3,7 @@
   "name": "Turnos",
   "seedIdea": "Vamos a hacer una aplicación de turnos para que se pueda reservar turnos. En este caso de mono usuario. Y para un solo proyecto. Puede ser para una peluquería, puede ser para un psicólogo, puede ser para reservar turnos para una clase. Pero algo sencillo de 1 a 1. Nada más, es lo que tenemos. Juan, al proceso.",
   "createdAt": 1787694862375,
-  "updatedAt": 1787696100898,
+  "updatedAt": 1787696647183,
   "answers": {
     "q_auth": "Email y Contraseña tradicional",
     "q_database": "Relacional (PostgreSQL/MySQL)",

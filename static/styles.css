@@ -937,12 +937,17 @@ body {
 /* Vista de Markdown */
 .markdown-preview-container {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr; /* Por defecto: pantalla completa de visualización */
     gap: 16px;
     height: 100%;
     overflow: hidden;
+    transition: grid-template-columns 0.2s ease;
+}
+.markdown-preview-container.edit-mode {
+    grid-template-columns: 1fr 1fr; /* Modo edición: pantalla partida */
 }
 .markdown-editor {
+    display: none; /* Oculto por defecto en modo lectura */
     height: 100%;
     width: 100%;
     background-color: rgba(0, 0, 0, 0.2);
@@ -955,6 +960,9 @@ body {
     outline: none;
     resize: none;
     line-height: 1.5;
+}
+.markdown-preview-container.edit-mode .markdown-editor {
+    display: block; /* Visible sólo al editar */
 }
 .markdown-editor:focus {
     border-color: var(--border-color-focus);
