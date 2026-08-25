@@ -989,6 +989,44 @@ async def autocomplete_file(req: AutocompleteFileRequest, x_gemini_key: str = He
         logger.error(f"Error autocompletando {filename}: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/api/open-specs-folder")
+async def open_specs_folder():
+    import platform
+    import shutil
+    import subprocess
+    
+    dir_path = SPECS_DIR
+    if not os.path.exists(dir_path):
+        os.makedirs(dir_path, exist_ok=True)
+        
+    logger.info(f"Abriendo la carpeta de specs {dir_path} en el editor...")
+    
+    try:
+        # Intentar con Cursor primero
+        if shutil.which("cursor"):
+            subprocess.Popen(["cursor", dir_path])
+            return {"status": "success", "message": "Abierto con Cursor"}
+            
+        # Intentar con VS Code
+        if shutil.which("code"):
+            subprocess.Popen(["code", dir_path])
+            return {"status": "success", "message": "Abierto con VS Code"}
+            
+        # Fallback al sistema operativo por defecto
+        system_name = platform.system()
+        if system_name == "Darwin": # macOS
+            subprocess.Popen(["open", dir_path])
+        elif system_name == "Windows":
+            import os
+            os.startfile(dir_path)
+        else: # Linux y otros
+            subprocess.Popen(["xdg-open", dir_path])
+            
+        return {"status": "success", "message": "Abierto con el programa por defecto del sistema"}
+    except Exception as e:
+        logger.error(f"Error al abrir la carpeta de specs: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 # Servir index.html para todas las demás rutas no API (SPA routing fallback)
 @app.get("/{rest_of_path:path}")
 async def serve_spa(rest_of_path: str):

@@ -259,10 +259,26 @@ function setupEventListeners() {
     document.getElementById('btn-start-planning-analysis').addEventListener('click', runPlanningAnalysis);
     document.getElementById('btn-submit-generation').addEventListener('click', submitFeatureGeneration);
 
+    // Abrir la carpeta de especificaciones local en el editor
+    document.getElementById('btn-open-in-editor').addEventListener('click', async () => {
+        try {
+            const response = await fetch('/api/open-specs-folder', {
+                method: 'POST'
+            });
+            const data = await response.json();
+            if (data.status === 'success') {
+                showToast(data.message, "success");
+            } else {
+                throw new Error("No se pudo abrir la carpeta");
+            }
+        } catch (e) {
+            console.error(e);
+            showToast("Error al abrir la carpeta de especificaciones", "error");
+        }
+    });
+
     // Completar con IA en el editor
     document.getElementById('btn-ai-autocomplete').addEventListener('click', autocompleteActiveSection);
-
-
 }
 
 // Alternar pantallas del SPA
