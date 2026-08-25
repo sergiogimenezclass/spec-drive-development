@@ -775,7 +775,7 @@ body {
    ========================================================================== */
 .workspace-layout {
     display: grid;
-    grid-template-columns: 280px 1fr 380px;
+    grid-template-columns: 280px 1fr;
     height: calc(100vh - 64px);
     overflow: hidden;
 }

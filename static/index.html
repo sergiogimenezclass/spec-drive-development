@@ -275,33 +275,7 @@
                         </div>
                     </section>
 
-                    <!-- PANEL DERECHO: DIAGRAMAS -->
-                    <aside class="workspace-inspector">
-                        <div class="inspector-header-simple" style="padding: 16px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; gap: 8px;">
-                            <i class="fa-solid fa-diagram-project" style="color: var(--primary-color);"></i>
-                            <h3 style="font-family: var(--font-title); font-size: 14px; margin: 0; font-weight: 600;">Diagramas Mermaid</h3>
-                        </div>
 
-                        <div class="inspector-content">
-                            <!-- Pestaña Única: Diagramas Mermaid -->
-                            <div id="inspector-tab-diagrams" class="inspector-tab-content active" style="padding: 16px; display: flex; flex-direction: column; gap: 16px; height: calc(100% - 50px); overflow-y: auto;">
-                                <div class="diagram-controls">
-                                    <select id="diagram-type-select">
-                                        <option value="er">Entidad Relación (BD)</option>
-                                        <option value="flow">Flujo de Usuario</option>
-                                        <option value="architecture">Arquitectura Técnica</option>
-                                    </select>
-                                    <button id="btn-regenerate-diagram" class="btn btn-border btn-sm"><i class="fa-solid fa-rotate"></i> Generar</button>
-                                </div>
-                                <div class="diagram-viewer" id="mermaid-diagram-viewer">
-                                    <div class="empty-diagram-state">
-                                        <i class="fa-solid fa-crop-simple"></i>
-                                        <p>Haz clic en "Generar" para crear el diagrama usando IA.</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </aside>
 
                 </div>
             </section>
@@ -370,6 +344,6 @@
     <!-- Notificaciones flotantes -->
     <div id="toast-container" class="toast-container"></div>
 
-    <script src="app.js?v=2.0.5"></script>
+    <script src="app.js?v=2.0.6"></script>
 </body>
 </html>

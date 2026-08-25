@@ -262,8 +262,7 @@ function setupEventListeners() {
     // Completar con IA en el editor
     document.getElementById('btn-ai-autocomplete').addEventListener('click', autocompleteActiveSection);
 
-    // Regenerar Diagrama
-    document.getElementById('btn-regenerate-diagram').addEventListener('click', generateDiagram);
+
 }
 
 // Alternar pantallas del SPA
@@ -857,53 +856,7 @@ async function exportSpecsToDisk() {
     }
 }
 
-// Generar diagrama Mermaid interactivo
-async function generateDiagram() {
-    if (!state.apiKey && !state.hasBackendApiKey) {
-        showToast("Ingresa tu API Key de Gemini en el Header o configúrala en el servidor", "error");
-        return;
-    }
-    
-    const type = document.getElementById('diagram-type-select').value;
-    const viewer = document.getElementById('mermaid-diagram-viewer');
-    
-    viewer.innerHTML = '<div class="spinner"></div><p style="margin-top:10px; font-size:12px; color:var(--text-secondary);">Generando diagrama por IA...</p>';
-    
-    try {
-        const response = await fetch('/api/generate-diagram', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Gemini-Key': state.apiKey
-            },
-            body: JSON.stringify({
-                diagram_type: type,
-                answers: state.currentProject.answers
-            })
-        });
-        const data = await response.json();
-        const code = data.code;
-        
-        viewer.innerHTML = `<pre class="mermaid" id="active-mermaid-element">${code}</pre>`;
-        
-        // Forzar renderizado de Mermaid
-        const element = document.getElementById('active-mermaid-element');
-        await mermaid.run({
-            nodes: [element]
-        });
-        
-    } catch (e) {
-        console.error(e);
-        viewer.innerHTML = `
-            <div class="empty-diagram-state">
-                <i class="fa-solid fa-circle-exclamation" style="color:var(--danger)"></i>
-                <p>Error al renderizar el diagrama de Mermaid. <br>Revisa tu API key e inténtalo de nuevo.</p>
-            </div>
-        `;
-    }
-}
-
-// Diagramas renderizados con Mermaid.js
+// Panel de visualización de especificaciones limpio
 
 // Sistema de Toast Notifications
 function showToast(message, type = 'info') {
