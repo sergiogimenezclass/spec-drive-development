@@ -242,10 +242,7 @@
                                 <i class="fa-solid fa-file-export"></i> Exportar
                             </button>
                         </div>
-                        <nav class="spec-tree" id="spec-tree-nav">
-                            <!-- Los archivos de especificación se inyectan aquí dinámicamente -->
-                        </nav>
-                        <div class="sidebar-planning-action" style="padding: var(--spacing-md); border-top: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 8px;">
+                        <div class="sidebar-planning-action" style="padding: var(--spacing-md); border-bottom: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 8px;">
                             <button id="btn-open-in-editor" class="btn btn-primary btn-full-width" style="display: flex; align-items: center; justify-content: center; gap: 8px;">
                                 <i class="fa-solid fa-arrow-up-right-from-square"></i>
                                 Abrir en tu Editor Local
@@ -255,6 +252,9 @@
                                 Desglosar Features con IA
                             </button>
                         </div>
+                        <nav class="spec-tree" id="spec-tree-nav">
+                            <!-- Los archivos de especificación se inyectan aquí dinámicamente -->
+                        </nav>
                     </aside>
 
                     <!-- PANEL CENTRAL: EDITOR Y DETALLE -->
@@ -348,6 +348,6 @@
     <!-- Notificaciones flotantes -->
     <div id="toast-container" class="toast-container"></div>
 
-    <script src="app.js?v=2.0.8"></script>
+    <script src="app.js?v=2.0.9"></script>
 </body>
 </html>
