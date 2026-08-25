@@ -265,22 +265,7 @@ function setupEventListeners() {
     // Completar con IA en el editor
     document.getElementById('btn-ai-autocomplete').addEventListener('click', autocompleteActiveSection);
 
-    // Pestañas del Editor (Formulario vs Markdown)
-    const editorTabs = document.querySelectorAll('.editor-tab');
-    editorTabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-            editorTabs.forEach(t => t.classList.remove('active'));
-            tab.classList.add('active');
-            
-            const view = tab.dataset.view;
-            document.querySelectorAll('.editor-tab-content').forEach(c => c.classList.remove('active'));
-            document.getElementById(`editor-view-${view}`).classList.add('active');
-            
-            if (view === 'markdown') {
-                updateMarkdownPreview();
-            }
-        });
-    });
+    // Pestañas del Editor eliminadas para simplificar el flujo
 
     // Sincronizar edición manual de Markdown con respuestas del proyecto
     document.getElementById('markdown-raw-editor').addEventListener('input', (e) => {
@@ -769,6 +754,7 @@ function renderSpecTree() {
 }
 
 // Seleccionar archivo activo en el IDE
+// Seleccionar archivo activo en el IDE
 function selectSpecFile(filename) {
     state.activeSpecFile = filename;
     document.getElementById('active-spec-title').innerText = filename;
@@ -776,104 +762,11 @@ function selectSpecFile(filename) {
     // Cambiar clase activa en el árbol
     renderSpecTree();
     
-    // Cargar cuestionario o editor Markdown
-    const formContainer = document.getElementById('active-spec-form-container');
-    formContainer.innerHTML = '';
-    
-    const isFeature = filename.startsWith('features/');
-    const formTab = Array.from(document.querySelectorAll('.editor-tab')).find(t => t.dataset.view === 'form');
-    
-    if (isFeature) {
-        if (formTab) formTab.classList.add('hidden');
-        switchEditorView('markdown');
-        
-        // Cargar contenido de la feature
-        const mdContent = state.currentProject.specModules[filename] || '';
-        document.getElementById('markdown-raw-editor').value = mdContent;
-        renderMarkdownHTML(mdContent);
-        
-    } else {
-        if (formTab) formTab.classList.remove('hidden');
-        switchEditorView('form');
-        
-        // Buscamos preguntas previas del Wizard de esta categoría
-        const fileCategoryMap = {
-            'product.md': 'Producto',
-            'requirements.md': 'Requisitos',
-            'architecture.md': 'Arquitectura',
-            'database.md': 'Base de datos',
-            'api.md': 'API',
-            'security.md': 'Seguridad',
-            'roadmap.md': 'General'
-        };
-        
-        const cat = fileCategoryMap[filename] || '';
-        const relevantQuestions = state.questionTree.filter(q => q.section === cat);
-        
-        if (relevantQuestions.length > 0) {
-            const title = document.createElement('h3');
-            title.innerText = `Datos estructurados - ${cat}`;
-            formContainer.appendChild(title);
-            
-            relevantQuestions.forEach(q => {
-                const formGroup = document.createElement('div');
-                formGroup.className = 'form-group';
-                
-                const label = document.createElement('label');
-                label.innerText = q.label;
-                formGroup.appendChild(label);
-                
-                const val = state.currentProject.answers[q.id] || '';
-                
-                if (q.type === 'select') {
-                    const select = document.createElement('select');
-                    select.style.padding = '12px';
-                    select.style.backgroundColor = 'rgba(255,255,255,0.04)';
-                    select.style.color = 'var(--text-primary)';
-                    select.style.border = '1px solid var(--border-color)';
-                    select.style.borderRadius = '8px';
-                    select.style.outline = 'none';
-                    
-                    q.options.forEach(opt => {
-                        const option = document.createElement('option');
-                        option.value = opt;
-                        option.text = opt;
-                        if (opt === val) option.selected = true;
-                        select.appendChild(option);
-                    });
-                    
-                    select.addEventListener('change', (e) => {
-                        state.currentProject.answers[q.id] = e.target.value;
-                        updateGlobalProgressBar();
-                    });
-                    formGroup.appendChild(select);
-                } else {
-                    const input = document.createElement('textarea');
-                    input.value = val;
-                    input.addEventListener('input', (e) => {
-                        state.currentProject.answers[q.id] = e.target.value;
-                        updateGlobalProgressBar();
-                    });
-                    formGroup.appendChild(input);
-                }
-                formContainer.appendChild(formGroup);
-            });
-        } else {
-            formContainer.innerHTML = `
-                <div class="empty-projects-state">
-                    <i class="fa-solid fa-file-signature" style="font-size: 32px;"></i>
-                    <h3>Sección Libre</h3>
-                    <p>Usa la pestaña "Visualizar Markdown" o haz clic en "Completar con IA" para redactar esta especificación.</p>
-                </div>
-            `;
-        }
-        
-        // Cargar contenido Markdown en el editor raw
-        const moduleName = filename.replace('.md', '').replace('.json', '');
-        const mdContent = (state.currentProject.specModules && state.currentProject.specModules[moduleName]) || '';
-        document.getElementById('markdown-raw-editor').value = mdContent;
-        renderMarkdownHTML(mdContent);
-    }
+    // Cargar contenido Markdown en el editor raw
+    const moduleName = filename.replace('.md', '').replace('.json', '');
+    const mdContent = (state.currentProject.specModules && state.currentProject.specModules[moduleName]) || '';
+    document.getElementById('markdown-raw-editor').value = mdContent;
+    renderMarkdownHTML(mdContent);
 }
 
 // Actualizar la pestaña de Markdown Preview
@@ -1254,25 +1147,7 @@ function showToast(message, type = 'info') {
     }, 3500);
 }
 
-// Alternar vista del editor (Respuestas vs Markdown)
-function switchEditorView(viewName) {
-    const editorTabs = document.querySelectorAll('.editor-tab');
-    editorTabs.forEach(t => {
-        if (t.dataset.view === viewName) {
-            t.classList.add('active');
-        } else {
-            t.classList.remove('active');
-        }
-    });
-    document.querySelectorAll('.editor-tab-content').forEach(c => c.classList.remove('active'));
-    
-    const viewEl = document.getElementById(`editor-view-${viewName}`);
-    if (viewEl) viewEl.classList.add('active');
-    
-    if (viewName === 'markdown') {
-        updateMarkdownPreview();
-    }
-}
+// switchEditorView eliminada
 
 // Cambiar estado visual del modal de planificación
 function showPlanningState(stateName) {

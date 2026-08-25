@@ -269,21 +269,8 @@
                         </div>
 
                         <div class="editor-workspace">
-                            <!-- Pestañas de edición / visualización -->
-                            <div class="editor-tabs">
-                                <button class="editor-tab active" data-view="form">Respuestas Guía</button>
-                                <button class="editor-tab" data-view="markdown">Visualizar Markdown</button>
-                            </div>
-
-                            <!-- VISTA 1: FORMULARIO RESPUESTAS GUÍA -->
-                            <div id="editor-view-form" class="editor-tab-content active">
-                                <div class="form-guidelines" id="active-spec-form-container">
-                                    <!-- Cuestionario y campos de edición adaptativos para el archivo activo -->
-                                </div>
-                            </div>
-
-                            <!-- VISTA 2: MARKDOWN PREVIEW / EDITOR -->
-                            <div id="editor-view-markdown" class="editor-tab-content">
+                            <!-- VISTA ÚNICA: MARKDOWN PREVIEW / EDITOR -->
+                            <div id="editor-view-markdown" class="editor-tab-content active" style="flex: 1; display: flex; flex-direction: column; height: 100%;">
                                 <div class="markdown-preview-container">
                                     <textarea id="markdown-raw-editor" class="markdown-editor" placeholder="Cargando contenido en Markdown..."></textarea>
                                     <div class="markdown-preview-pane" id="markdown-preview-pane">

@@ -1,0 +1,1478 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "API de Gestión de Citas y Turnos",
+    "description": "API RESTful para una aplicación de reservas de turnos 1 a 1. Permite a un único profesional (proveedor de servicio) gestionar su disponibilidad y servicios, mientras que los clientes pueden reservar, cancelar y reagendar citas. La aplicación está diseñada para ser sencilla y mono-usuario en la gestión por parte del proveedor.",
+    "version": "1.0.0",
+    "contact": {
+      "name": "Equipo de Desarrollo",
+      "email": "contacto@ejemplo.com"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://api.ejemplo.com/v1",
+      "description": "Servidor de Producción"
+    },
+    {
+      "url": "http://localhost:3000/v1",
+      "description": "Servidor de Desarrollo Local"
+    }
+  ],
+  "security": [
+    {
+      "BearerAuth": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "Autenticación",
+      "description": "Operaciones para la autenticación del profesional (usuario principal)."
+    },
+    {
+      "name": "Servicios (Profesional)",
+      "description": "Gestión de los tipos de servicio ofrecidos por el profesional."
+    },
+    {
+      "name": "Disponibilidad (Profesional)",
+      "description": "Gestión de los bloques de tiempo disponibles para reservas por el profesional."
+    },
+    {
+      "name": "Reservas (Profesional)",
+      "description": "Gestión y visualización de todas las reservas desde la perspectiva del profesional."
+    },
+    {
+      "name": "Reservas (Cliente)",
+      "description": "Operaciones públicas para que los clientes interactúen con las reservas (consultar, reservar, cancelar, reagendar)."
+    }
+  ],
+  "paths": {
+    "/auth/register": {
+      "post": {
+        "summary": "Registrar cuenta del profesional",
+        "description": "Permite al único profesional crear su cuenta inicial con email y contraseña. **Este endpoint debería ser accesible solo para el primer setup de la aplicación.**",
+        "operationId": "registerProfessional",
+        "tags": ["Autenticación"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name", "email", "password"],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "example": "Juan Pérez (Peluquero)"
+                  },
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "example": "juan.perez@ejemplo.com"
+                  },
+                  "password": {
+                    "type": "string",
+                    "format": "password",
+                    "minLength": 8,
+                    "example": "MiContraseñaSegura123"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Profesional registrado exitosamente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthSuccessResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Solicitud inválida o el email ya está registrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "summary": "Iniciar sesión del profesional",
+        "description": "Autentica al profesional usando email y contraseña y devuelve un token de acceso JWT.",
+        "operationId": "loginProfessional",
+        "tags": ["Autenticación"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email", "password"],
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "example": "juan.perez@ejemplo.com"
+                  },
+                  "password": {
+                    "type": "string",
+                    "format": "password",
+                    "example": "MiContraseñaSegura123"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Inicio de sesión exitoso.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthSuccessResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Credenciales inválidas.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/professional/services": {
+      "get": {
+        "summary": "Obtener todos los servicios",
+        "description": "Recupera una lista de todos los servicios ofrecidos por el profesional.",
+        "operationId": "getServices",
+        "tags": ["Servicios (Profesional)"],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de servicios.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Service"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autorizado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Crear un nuevo servicio",
+        "description": "Añade un nuevo tipo de servicio que el profesional puede ofrecer, especificando su nombre, descripción y duración.",
+        "operationId": "createService",
+        "tags": ["Servicios (Profesional)"],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name", "durationMinutes"],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "example": "Corte de Pelo Masculino"
+                  },
+                  "description": {
+                    "type": "string",
+                    "nullable": true,
+                    "example": "Servicio de corte de pelo básico para hombres."
+                  },
+                  "durationMinutes": {
+                    "type": "integer",
+                    "format": "int32",
+                    "minimum": 5,
+                    "example": 30
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Servicio creado exitosamente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Service"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos de servicio inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autorizado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/professional/services/{serviceId}": {
+      "get": {
+        "summary": "Obtener un servicio por ID",
+        "description": "Recupera los detalles de un servicio específico por su ID.",
+        "operationId": "getServiceById",
+        "tags": ["Servicios (Profesional)"],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ServiceId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Detalles del servicio.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Service"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autorizado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Servicio no encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Actualizar un servicio",
+        "description": "Actualiza la información (nombre, descripción, duración) de un servicio existente.",
+        "operationId": "updateService",
+        "tags": ["Servicios (Profesional)"],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ServiceId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "example": "Corte de Pelo y Barba"
+                  },
+                  "description": {
+                    "type": "string",
+                    "nullable": true,
+                    "example": "Servicio completo de corte de pelo y arreglo de barba."
+                  },
+                  "durationMinutes": {
+                    "type": "integer",
+                    "format": "int32",
+                    "minimum": 5,
+                    "example": 45
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Servicio actualizado exitosamente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Service"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos de servicio inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autorizado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Servicio no encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Eliminar un servicio",
+        "description": "Elimina un servicio existente. Si el servicio está asociado a reservas activas, la operación podría fallar o requerir una confirmación para cancelar las reservas dependientes.",
+        "operationId": "deleteService",
+        "tags": ["Servicios (Profesional)"],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ServiceId"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Servicio eliminado exitosamente."
+          },
+          "401": {
+            "description": "No autorizado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Servicio no encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto: El servicio está asociado a reservas activas.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/professional/availability/slots": {
+      "post": {
+        "summary": "Crear slots de disponibilidad",
+        "description": "Permite al profesional definir uno o varios bloques de tiempo específicos que están disponibles para ser reservados. Estos slots pueden estar asociados a un servicio o ser genéricos.",
+        "operationId": "createAvailabilitySlots",
+        "tags": ["Disponibilidad (Profesional)"],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["startTime", "endTime"],
+                  "properties": {
+                    "startTime": {
+                      "type": "string",
+                      "format": "date-time",
+                      "example": "2024-03-15T09:00:00Z"
+                    },
+                    "endTime": {
+                      "type": "string",
+                      "format": "date-time",
+                      "example": "2024-03-15T09:30:00Z"
+                    },
+                    "serviceId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "nullable": true,
+                      "description": "Opcional: ID del servicio específico al que se asocia este slot. Si no se especifica, el slot es genérico y puede ser reservado por cualquier servicio compatible con su duración."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Slots de disponibilidad creados exitosamente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AvailabilitySlot"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos de slot inválidos (ej. endTime antes de startTime, solapamiento).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autorizado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "Obtener slots de disponibilidad (Profesional)",
+        "description": "Recupera todos los slots de disponibilidad definidos por el profesional, incluyendo los que ya están reservados. Puede filtrarse por rango de fechas.",
+        "operationId": "getProfessionalAvailabilitySlots",
+        "tags": ["Disponibilidad (Profesional)", "Reservas (Profesional)"],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "startDate",
+            "in": "query",
+            "description": "Fecha de inicio para filtrar slots (YYYY-MM-DD)",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "example": "2024-03-15"
+          },
+          {
+            "name": "endDate",
+            "in": "query",
+            "description": "Fecha de fin para filtrar slots (YYYY-MM-DD)",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "example": "2024-03-22"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de slots de disponibilidad.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AvailabilitySlot"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autorizado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/professional/availability/slots/{slotId}": {
+      "delete": {
+        "summary": "Eliminar un slot de disponibilidad",
+        "description": "Elimina un slot de disponibilidad. Si el slot está reservado, se puede requerir un parámetro de fuerza para cancelar la reserva asociada.",
+        "operationId": "deleteAvailabilitySlot",
+        "tags": ["Disponibilidad (Profesional)"],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AvailabilitySlotId"
+          },
+          {
+            "name": "force",
+            "in": "query",
+            "description": "Si es 'true' y el slot está reservado, la reserva asociada también será cancelada. Default: false.",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Slot eliminado exitosamente."
+          },
+          "401": {
+            "description": "No autorizado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Slot no encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto: El slot está reservado y no se ha usado 'force=true'.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/professional/bookings": {
+      "get": {
+        "summary": "Obtener todas las reservas (Profesional)",
+        "description": "Recupera una lista de todas las reservas gestionadas por el profesional, incluyendo las activas y canceladas. Puede ser filtrado por rango de fechas o estado.",
+        "operationId": "getAllBookingsProfessional",
+        "tags": ["Reservas (Profesional)"],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "startDate",
+            "in": "query",
+            "description": "Fecha de inicio para filtrar reservas (YYYY-MM-DD)",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "example": "2024-03-15"
+          },
+          {
+            "name": "endDate",
+            "in": "query",
+            "description": "Fecha de fin para filtrar reservas (YYYY-MM-DD)",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "example": "2024-03-22"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "Filtrar por estado de reserva.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["pending", "confirmed", "cancelled", "rescheduled"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de reservas.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Booking"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autorizado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/professional/bookings/{bookingId}": {
+      "get": {
+        "summary": "Obtener una reserva específica (Profesional)",
+        "description": "Recupera los detalles completos de una reserva por su ID, vista desde la perspectiva del profesional.",
+        "operationId": "getBookingByIdProfessional",
+        "tags": ["Reservas (Profesional)"],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/BookingId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Detalles de la reserva.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Booking"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autorizado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Reserva no encontrada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Actualizar el estado o reagendar una reserva (Profesional)",
+        "description": "Permite al profesional cambiar el estado de una reserva (ej. 'confirmed', 'cancelled') o reagendarla a un nuevo slot disponible. Se enviará una notificación por email al cliente.",
+        "operationId": "updateBookingProfessional",
+        "tags": ["Reservas (Profesional)"],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/BookingId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": ["pending", "confirmed", "cancelled"],
+                    "description": "Nuevo estado de la reserva. 'rescheduled' se maneja implícitamente al proporcionar 'newSlotId'."
+                  },
+                  "newSlotId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "nullable": true,
+                    "description": "ID del nuevo slot de disponibilidad para reagendar la cita. Si se proporciona, el estado se actualiza a 'rescheduled'."
+                  },
+                  "professionalNotes": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "Notas internas del profesional sobre el cambio."
+                  }
+                },
+                "oneOf": [
+                  {"required": ["status"]},
+                  {"required": ["newSlotId"]}
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Reserva actualizada/reagendada exitosamente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Booking"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Solicitud inválida (ej. newSlotId no disponible o incompatible con el servicio).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autorizado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Reserva, slot original o nuevo slot no encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto: El nuevo slot ya está reservado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/public/availability": {
+      "get": {
+        "summary": "Obtener slots de disponibilidad públicos",
+        "description": "Recupera una lista de slots de disponibilidad que están *libres* y disponibles para ser reservados por los clientes. Puede filtrar por rango de fechas y servicio.",
+        "operationId": "getPublicAvailability",
+        "tags": ["Reservas (Cliente)"],
+        "parameters": [
+          {
+            "name": "startDate",
+            "in": "query",
+            "description": "Fecha de inicio para filtrar slots (YYYY-MM-DD)",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "example": "2024-03-15"
+          },
+          {
+            "name": "endDate",
+            "in": "query",
+            "description": "Fecha de fin para filtrar slots (YYYY-MM-DD)",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "example": "2024-03-22"
+          },
+          {
+            "name": "serviceId",
+            "in": "query",
+            "description": "Filtrar slots asociados a un servicio específico.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de slots de disponibilidad disponibles.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AvailabilitySlot"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/public/bookings": {
+      "post": {
+        "summary": "Reservar un turno (Cliente)",
+        "description": "Permite a un cliente reservar un slot de disponibilidad para un servicio. Se requiere información del cliente (nombre, email) y del slot/servicio deseado. Se enviará una confirmación de la reserva por email al cliente con el ID de la reserva.",
+        "operationId": "createClientBooking",
+        "tags": ["Reservas (Cliente)"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["clientName", "clientEmail", "slotId", "serviceId"],
+                "properties": {
+                  "clientName": {
+                    "type": "string",
+                    "example": "María García"
+                  },
+                  "clientEmail": {
+                    "type": "string",
+                    "format": "email",
+                    "example": "maria.garcia@ejemplo.com"
+                  },
+                  "slotId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "ID del slot de disponibilidad que el cliente desea reservar."
+                  },
+                  "serviceId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "ID del servicio que el cliente desea reservar."
+                  },
+                  "clientNotes": {
+                    "type": "string",
+                    "nullable": true,
+                    "example": "Quiero un corte degradado."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Reserva creada exitosamente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Booking"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Solicitud inválida (ej. slot ya reservado, servicio no compatible con el slot).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Slot o servicio no encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto: El slot ya ha sido reservado por otro cliente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/public/bookings/{bookingId}": {
+      "get": {
+        "summary": "Consultar una reserva (Cliente)",
+        "description": "Permite a un cliente consultar los detalles de su reserva, usando el ID de reserva y su email para verificación. El ID se asume que fue enviado por email tras la reserva.",
+        "operationId": "getClientBookingDetails",
+        "tags": ["Reservas (Cliente)"],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/BookingId"
+          },
+          {
+            "name": "clientEmail",
+            "in": "query",
+            "description": "Email del cliente asociado a la reserva, para verificación de identidad.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "email"
+            },
+            "example": "maria.garcia@ejemplo.com"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Detalles de la reserva.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Booking"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Email o bookingId inválido/no coincide con la reserva.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Reserva no encontrada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/public/bookings/{bookingId}/cancel": {
+      "put": {
+        "summary": "Cancelar una reserva (Cliente)",
+        "description": "Permite a un cliente cancelar su reserva, usando el ID de reserva y su email para verificación. Se enviará una notificación por email al profesional y al cliente.",
+        "operationId": "cancelClientBooking",
+        "tags": ["Reservas (Cliente)"],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/BookingId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["clientEmail"],
+                "properties": {
+                  "clientEmail": {
+                    "type": "string",
+                    "format": "email",
+                    "example": "maria.garcia@ejemplo.com"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Reserva cancelada exitosamente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Booking"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "La reserva ya está cancelada o no se puede cancelar (ej. falta poco para la cita).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Email o bookingId inválido/no coincide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Reserva no encontrada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/public/bookings/{bookingId}/reschedule": {
+      "put": {
+        "summary": "Reagendar una reserva (Cliente)",
+        "description": "Permite a un cliente reagendar su reserva a un nuevo slot de disponibilidad, usando el ID de reserva y su email para verificación. Se enviarán notificaciones por email.",
+        "operationId": "rescheduleClientBooking",
+        "tags": ["Reservas (Cliente)"],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/BookingId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["clientEmail", "newSlotId"],
+                "properties": {
+                  "clientEmail": {
+                    "type": "string",
+                    "format": "email",
+                    "example": "maria.garcia@ejemplo.com"
+                  },
+                  "newSlotId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "ID del nuevo slot de disponibilidad al que se desea mover la reserva."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Reserva reagendada exitosamente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Booking"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Solicitud inválida (ej. newSlotId no disponible, incompatible con el servicio o el cambio no es permitido).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Email o bookingId inválido/no coincide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Reserva, slot original o nuevo slot no encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto: El nuevo slot ya está reservado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ProfessionalUser": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "readOnly": true,
+            "example": "a1b2c3d4-e5f6-7890-1234-567890abcdef"
+          },
+          "name": {
+            "type": "string",
+            "example": "Juan Pérez"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "juan.perez@ejemplo.com"
+          }
+        }
+      },
+      "AuthSuccessResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "example": "Autenticación exitosa"
+          },
+          "token": {
+            "type": "string",
+            "description": "Token JWT para futuras solicitudes autenticadas del profesional.",
+            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjEyMyIsImVtYWlsIjoianVhbi5wZXJlekBleGVtcGxvLmNvbSIsImlhdCI6MTY3ODkwNTYwMCwiZXhwIjoxNjc4OTEyODAwfQ.SignatureDeEjemplo"
+          },
+          "user": {
+            "$ref": "#/components/schemas/ProfessionalUser"
+          }
+        },
+        "required": ["message", "token", "user"]
+      },
+      "Service": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "readOnly": true,
+            "example": "s1a2b3c4-d5e6-7890-1234-567890abcdef"
+          },
+          "name": {
+            "type": "string",
+            "example": "Corte de Pelo"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true,
+            "example": "Servicio estándar de corte de pelo."
+          },
+          "durationMinutes": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 5,
+            "example": 30
+          }
+        },
+        "required": ["id", "name", "durationMinutes"]
+      },
+      "AvailabilitySlot": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "readOnly": true,
+            "example": "slot1a2b3c-d4e5-6789-0123-456789abcdef"
+          },
+          "startTime": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2024-03-15T09:00:00Z"
+          },
+          "endTime": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2024-03-15T09:30:00Z"
+          },
+          "isBooked": {
+            "type": "boolean",
+            "readOnly": true,
+            "default": false,
+            "example": false
+          },
+          "serviceId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "ID del servicio asociado a este slot, si es específico. Un slot genérico no tendría este ID.",
+            "example": "s1a2b3c4-d5e6-7890-1234-567890abcdef"
+          }
+        },
+        "required": ["id", "startTime", "endTime", "isBooked"]
+      },
+      "Booking": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "readOnly": true,
+            "example": "book1a2b3c-d4e5-6789-0123-456789abcdef"
+          },
+          "slotId": {
+            "type": "string",
+            "format": "uuid",
+            "example": "slot1a2b3c-d4e5-6789-0123-456789abcdef"
+          },
+          "serviceId": {
+            "type": "string",
+            "format": "uuid",
+            "example": "s1a2b3c4-d5e6-7890-1234-567890abcdef"
+          },
+          "clientName": {
+            "type": "string",
+            "example": "María García"
+          },
+          "clientEmail": {
+            "type": "string",
+            "format": "email",
+            "example": "maria.garcia@ejemplo.com"
+          },
+          "bookingTime": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Hora de inicio de la reserva, obtenida del slot.",
+            "example": "2024-03-15T09:00:00Z"
+          },
+          "endTime": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Hora de fin de la reserva, obtenida del slot.",
+            "example": "2024-03-15T09:30:00Z"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "confirmed", "cancelled", "rescheduled"],
+            "default": "pending",
+            "example": "confirmed"
+          },
+          "clientNotes": {
+            "type": "string",
+            "nullable": true,
+            "example": "Notas del cliente sobre la reserva."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true,
+            "example": "2024-03-14T10:00:00Z"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true,
+            "example": "2024-03-14T10:00:00Z"
+          }
+        },
+        "required": ["id", "slotId", "serviceId", "clientName", "clientEmail", "bookingTime", "endTime", "status", "createdAt", "updatedAt"]
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "example": "Error al procesar la solicitud."
+          },
+          "statusCode": {
+            "type": "integer",
+            "example": 400
+          },
+          "details": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true,
+            "example": ["El campo 'email' es inválido."]
+          }
+        },
+        "required": ["message", "statusCode"]
+      }
+    },
+    "parameters": {
+      "ServiceId": {
+        "name": "serviceId",
+        "in": "path",
+        "description": "ID único del servicio.",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "example": "s1a2b3c4-d5e6-7890-1234-567890abcdef"
+      },
+      "AvailabilitySlotId": {
+        "name": "slotId",
+        "in": "path",
+        "description": "ID único del slot de disponibilidad.",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "example": "slot1a2b3c-d4e5-6789-0123-456789abcdef"
+      },
+      "BookingId": {
+        "name": "bookingId",
+        "in": "path",
+        "description": "ID único de la reserva.",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "example": "book1a2b3c-d4e5-6789-0123-456789abcdef"
+      }
+    },
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Token JWT para autenticar al profesional en las operaciones de gestión."
+      }
+    }
+  }
+}
