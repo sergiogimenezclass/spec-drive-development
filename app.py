@@ -280,6 +280,38 @@ async def load_project():
     try:
         with open(PROJECT_FILE, "r", encoding="utf-8") as f:
             project_data = json.load(f)
+            
+        # Sincronizar specModules con los archivos reales en el disco si existen
+        if "specModules" not in project_data:
+            project_data["specModules"] = {}
+            
+        if os.path.exists(SPECS_DIR):
+            for filename in os.listdir(SPECS_DIR):
+                filepath = os.path.join(SPECS_DIR, filename)
+                if os.path.isfile(filepath):
+                    name_key = filename.replace(".md", "").replace(".json", "")
+                    try:
+                        with open(filepath, "r", encoding="utf-8") as file_obj:
+                            project_data["specModules"][name_key] = file_obj.read().strip()
+                    except Exception as e:
+                        logger.error(f"Error leyendo archivo en load_project: {str(e)}")
+            
+            # Sincronizar también para las features dinámicas
+            features_dir = os.path.join(SPECS_DIR, "features")
+            if os.path.exists(features_dir):
+                for folder in os.listdir(features_dir):
+                    folder_path = os.path.join(features_dir, folder)
+                    if os.path.isdir(folder_path):
+                        for feat_file in os.listdir(folder_path):
+                            feat_path = os.path.join(folder_path, feat_file)
+                            if os.path.isfile(feat_path):
+                                name_key = f"features/{folder}/{feat_file.replace('.md', '')}"
+                                try:
+                                    with open(feat_path, "r", encoding="utf-8") as file_obj:
+                                        project_data["specModules"][name_key] = file_obj.read().strip()
+                                except Exception as e:
+                                    logger.error(f"Error leyendo feature en load_project: {str(e)}")
+                                    
         return {"status": "success", "project": project_data}
     except Exception as e:
         logger.error(f"Error al cargar el proyecto: {str(e)}")
@@ -656,6 +688,12 @@ async def export_specs(req: SaveProjectRequest, x_gemini_key: str = Header(None)
     except Exception as e:
         logger.error(f"Error escribiendo en {PROJECT_FILE} en export_specs: {str(e)}")
         
+    return {
+        "status": "success",
+        "message": f"Se han generado {len(generated_files)} archivos de especificación en el directorio /specs/",
+        "files": generated_files
+    }
+
 @app.post("/api/plan-features")
 async def plan_features(req: SaveProjectRequest, x_gemini_key: str = Header(None)):
     model = get_gemini_model(x_gemini_key)
