@@ -53,6 +53,10 @@ class CopilotRequest(BaseModel):
     activeFile: str
     projectData: Dict[str, Any]
 
+class AutocompleteFileRequest(BaseModel):
+    project_data: Dict[str, Any]
+    filename: str
+
 # Helper para configurar Gemini y obtener el modelo
 def get_gemini_model(api_key: str):
     key_to_use = api_key.strip() if api_key else ""
@@ -886,6 +890,79 @@ async def copilot_chat(req: CopilotRequest, x_gemini_key: str = Header(None)):
     except Exception as e:
         logger.error(f"Error en chat copiloto: {str(e)}")
         return {"reply": f"Error al procesar consulta con Gemini: {str(e)}"}
+
+@app.post("/api/autocomplete-file")
+async def autocomplete_file(req: AutocompleteFileRequest, x_gemini_key: str = Header(None)):
+    model = get_gemini_model(x_gemini_key)
+    project = req.project_data
+    filename = req.filename
+    
+    answers = project.get("answers", {})
+    idea = project.get("seedIdea", "")
+    spec_modules = project.get("specModules", {})
+    
+    # Contexto existente
+    product_spec = spec_modules.get("product", "")
+    db_spec = spec_modules.get("database", "")
+    
+    # Prompt de autocompletado
+    prompt = f"""
+    Actúa como un Staff Software Architect de nivel mundial.
+    Tu objetivo es redactar el contenido técnico completo del archivo '{filename}' para el proyecto de especificación técnica.
+    
+    Idea semilla del producto:
+    "{idea}"
+    
+    Definiciones de producto y negocio:
+    {product_spec}
+    
+    Esquema y modelo de datos actual:
+    {db_spec}
+    
+    Respuestas dadas por el usuario en su entrevista de descubrimiento:
+    {json.dumps(answers, ensure_ascii=False)}
+    
+    INSTRUCCIONES DE DISEÑO:
+    1. Genera documentación técnica detallada, profesional y estructurada específica para el archivo '{filename}'.
+    2. Si el archivo es '{filename}', asegúrate de detallar todos los aspectos relacionados con su temática (por ejemplo, si es 'security.md' habla sobre roles, auth, cifrado, OWASP; si es 'roadmap.md' sobre fases de release; si es 'integrations.md' sobre pasarelas de pago, webhooks, etc.).
+    3. Si el archivo es 'openapi.json', devuelve únicamente un JSON válido que cumpla con el estándar OpenAPI 3.0.0. No incluyas explicaciones en texto para archivos JSON.
+    4. Para archivos Markdown, no utilices bloques de código Markdown generales (como ```markdown o ```) para envolver tu respuesta completa; simplemente escribe el contenido Markdown crudo directamente.
+    5. Utiliza tablas, listas y diagramas Mermaid si es oportuno para hacer el documento sumamente premium.
+    
+    Escribe el documento completo para '{filename}':
+    """
+    
+    logger.info(f"Autocompletando el archivo {filename} por IA...")
+    
+    try:
+        response = model.generate_content(prompt)
+        content = clean_markdown(response.text.strip())
+        
+        # Escribir directamente en la carpeta specs
+        filepath = os.path.join(SPECS_DIR, filename)
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+        with open(filepath, "w", encoding="utf-8") as f:
+            f.write(content)
+            
+        # Actualizar en memoria y project.json
+        if "specModules" not in project:
+            project["specModules"] = {}
+        
+        name_key = filename.replace(".md", "").replace(".json", "")
+        project["specModules"][name_key] = content
+        
+        with open(PROJECT_FILE, "w", encoding="utf-8") as f:
+            json.dump(project, f, ensure_ascii=False, indent=2)
+            
+        return {
+            "status": "success",
+            "message": f"Archivo {filename} autocompletado y guardado con éxito.",
+            "content": content,
+            "project": project
+        }
+    except Exception as e:
+        logger.error(f"Error autocompletando {filename}: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 # Servir index.html para todas las demás rutas no API (SPA routing fallback)
 @app.get("/{rest_of_path:path}")

@@ -846,26 +846,28 @@ async function autocompleteActiveSection() {
     showToast(`Gemini está redactando ${filename}...`, "info");
     
     try {
-        const response = await fetch('/api/export-specs', {
+        const response = await fetch('/api/autocomplete-file', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'X-Gemini-Key': state.apiKey
             },
-            body: JSON.stringify({ project_data: state.currentProject })
+            body: JSON.stringify({ 
+                project_data: state.currentProject,
+                filename: filename
+            })
         });
         
-        // Recargar el archivo especificado
-        const loadResp = await fetch('/api/load-project');
-        const loadData = await loadResp.json();
-        
-        if (loadData.status === 'success' && loadData.project) {
-            state.currentProject = loadData.project;
+        const data = await response.json();
+        if (data.status === 'success' && data.project) {
+            state.currentProject = data.project;
             const mdContent = state.currentProject.specModules[moduleName] || '';
             document.getElementById('markdown-raw-editor').value = mdContent;
             renderMarkdownHTML(mdContent);
             showToast(`${filename} redactado con éxito`, "success");
             updateGlobalProgressBar();
+        } else {
+            throw new Error(data.message || "Error al redactar la sección");
         }
     } catch (e) {
         console.error(e);
