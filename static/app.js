@@ -22,7 +22,7 @@ const state = {
     activeSpecFile: 'product.md',
     questionTree: [],
     activeQuestionIndex: 0,
-    isDarkTheme: true,
+    isDarkTheme: false,
     hasBackendApiKey: false,
     generationPath: 'guided',
     dynamicRounds: 0
@@ -73,7 +73,9 @@ function loadSettings() {
     document.getElementById('gemini-api-key').value = state.apiKey;
     
     const theme = localStorage.getItem('theme');
-    if (theme === 'light') {
+    if (theme === 'dark') {
+        state.isDarkTheme = true;
+    } else if (theme === 'light') {
         state.isDarkTheme = false;
     }
 }
