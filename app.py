@@ -1,7 +1,7 @@
 import os
 import json
 import logging
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from fastapi import FastAPI, HTTPException, Header, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -43,6 +43,10 @@ class NextQuestionsRequest(BaseModel):
 
 class SaveProjectRequest(BaseModel):
     project_data: Dict[str, Any]
+
+class PlanFeaturesRequest(BaseModel):
+    project_data: Dict[str, Any]
+    custom_feature: Optional[str] = None
 
 class DiagramRequest(BaseModel):
     diagram_type: str  # 'er', 'flow', 'architecture'
@@ -724,41 +728,73 @@ async def export_specs(req: SaveProjectRequest, x_gemini_key: str = Header(None)
     }
 
 @app.post("/api/plan-features")
-async def plan_features(req: SaveProjectRequest, x_gemini_key: str = Header(None)):
+async def plan_features(req: PlanFeaturesRequest, x_gemini_key: str = Header(None)):
     model = get_gemini_model(x_gemini_key)
     project = req.project_data
     answers = project.get("answers", {})
     idea = project.get("seedIdea", "")
     spec_modules = project.get("specModules", {})
+    custom_feature = req.custom_feature
     
     product_spec = spec_modules.get("product", "")
     reqs_spec = spec_modules.get("requirements", "")
     
-    prompt = f"""
-    Eres un Product Owner y Staff Software Architect.
-    Basándote en la idea del proyecto: "{idea}"
-    y la documentación de producto existente:
-    {product_spec}
-    {reqs_spec}
-    
-    Planifica la lista de características (features) y módulos necesarios para implementar la visión del producto.
-    Debes identificar entre 8 y 10 características clave.
-    Para cada característica, define:
-    1. Un ID corto, descriptivo y en minúsculas (ej: "login", "create-appointment").
-    2. Un nombre claro en español (ej: "Inicio de Sesión", "Reserva de Cita").
-    3. Una descripción breve (1-2 líneas).
-    4. Un nombre de directorio temático para agruparlo (ej: "auth", "dashboard", "appointments", "billing").
-    
-    Devuelve la información estructurada en el siguiente formato JSON estricto:
-    [
-        {{
-            "id": "id-corto",
-            "name": "Nombre de la Feature",
-            "description": "Descripción de la feature",
-            "folder": "nombre-carpeta"
-        }}
-    ]
-    """
+    if custom_feature and custom_feature.strip():
+        logger.info(f"Planificando feature personalizada: '{custom_feature.strip()}' por IA...")
+        prompt = f"""
+        Eres un Product Owner y Staff Software Architect.
+        El usuario desea planificar y agregar la siguiente funcionalidad específica a su proyecto: "{custom_feature.strip()}"
+        
+        Basándote en la idea general del proyecto: "{idea}"
+        y la documentación técnica / de producto existente:
+        {product_spec}
+        {reqs_spec}
+        
+        Planifica y desglosa en detalle esta funcionalidad específica en sub-características o tareas de especificación técnica necesarias para implementarla.
+        Identifica entre 2 y 5 sub-características/módulos clave directamente relacionados con la funcionalidad solicitada.
+        Para cada sub-característica, define:
+        1. Un ID corto, descriptivo y en minúsculas (ej: "payment-checkout", "stripe-webhook").
+        2. Un nombre claro en español (ej: "Checkout de Pago", "Webhook de Notificación de Pago").
+        3. Una descripción breve (1-2 líneas).
+        4. Un nombre de directorio temático para agruparlo (ej: "billing", "payments").
+        
+        Devuelve la información estructurada en el siguiente formato JSON estricto:
+        [
+            {{
+                "id": "id-corto",
+                "name": "Nombre de la Feature",
+                "description": "Descripción de la feature",
+                "folder": "nombre-carpeta"
+            }}
+        ]
+        """
+    else:
+        logger.info("Planificando lista general de features propuestas por IA...")
+        prompt = f"""
+        Eres un Product Owner y Staff Software Architect.
+        Basándote en la idea del proyecto: "{idea}"
+        y la documentación de producto existente:
+        {product_spec}
+        {reqs_spec}
+        
+        Planifica la lista de características (features) y módulos necesarios para implementar la visión del producto.
+        Debes identificar entre 8 y 10 características clave.
+        Para cada característica, define:
+        1. Un ID corto, descriptivo y en minúsculas (ej: "login", "create-appointment").
+        2. Un nombre claro en español (ej: "Inicio de Sesión", "Reserva de Cita").
+        3. Una descripción breve (1-2 líneas).
+        4. Un nombre de directorio temático para agruparlo (ej: "auth", "dashboard", "appointments", "billing").
+        
+        Devuelve la información estructurada en el siguiente formato JSON estricto:
+        [
+            {{
+                "id": "id-corto",
+                "name": "Nombre de la Feature",
+                "description": "Descripción de la feature",
+                "folder": "nombre-carpeta"
+            }}
+        ]
+        """
     
     try:
         response = model.generate_content(
@@ -769,16 +805,21 @@ async def plan_features(req: SaveProjectRequest, x_gemini_key: str = Header(None
         return {"status": "success", "features": features}
     except Exception as e:
         logger.error(f"Error planificando features por IA: {str(e)}")
-        fallback_features = [
-            {"id": "auth", "name": "Autenticación y Registro", "description": "Gestión de registro de usuarios y control de acceso.", "folder": "auth"},
-            {"id": "dashboard", "name": "Dashboard Principal", "description": "Vista consolidada de información clave y accesos rápidos.", "folder": "dashboard"},
-            {"id": "profile", "name": "Gestión de Perfil", "description": "Edición de datos de usuario y configuraciones personales.", "folder": "profile"},
-            {"id": "core-flow", "name": "Flujo Principal", "description": f"Funcionalidad principal del sistema para {idea}", "folder": "core"},
-            {"id": "notifications", "name": "Módulo de Notificaciones", "description": "Envío de correos y alertas en tiempo real al usuario.", "folder": "notifications"},
-            {"id": "settings", "name": "Configuraciones", "description": "Ajustes avanzados de seguridad e idioma.", "folder": "settings"},
-            {"id": "reports", "name": "Reportes y Estadísticas", "description": "Auditoría, logs de actividad y métricas de negocio.", "folder": "reports"},
-            {"id": "api-keys", "name": "Gestión de API Keys", "description": "Generación y revocación de tokens de acceso externo.", "folder": "developer"}
-        ]
+        if custom_feature and custom_feature.strip():
+            fallback_features = [
+                {"id": "custom-feature-spec", "name": f"Especificación de {custom_feature.strip()}", "description": f"Detalle técnico, endpoints e interfaz para {custom_feature.strip()}.", "folder": "custom"}
+            ]
+        else:
+            fallback_features = [
+                {"id": "auth", "name": "Autenticación y Registro", "description": "Gestión de registro de usuarios y control de acceso.", "folder": "auth"},
+                {"id": "dashboard", "name": "Dashboard Principal", "description": "Vista consolidada de información clave y accesos rápidos.", "folder": "dashboard"},
+                {"id": "profile", "name": "Gestión de Perfil", "description": "Edición de datos de usuario y configuraciones personales.", "folder": "profile"},
+                {"id": "core-flow", "name": "Flujo Principal", "description": f"Funcionalidad principal del sistema para {idea}", "folder": "core"},
+                {"id": "notifications", "name": "Módulo de Notificaciones", "description": "Envío de correos y alertas en tiempo real al usuario.", "folder": "notifications"},
+                {"id": "settings", "name": "Configuraciones", "description": "Ajustes avanzados de seguridad e idioma.", "folder": "settings"},
+                {"id": "reports", "name": "Reportes y Estadísticas", "description": "Auditoría, logs de actividad y métricas de negocio.", "folder": "reports"},
+                {"id": "api-keys", "name": "Gestión de API Keys", "description": "Generación y revocación de tokens de acceso externo.", "folder": "developer"}
+            ]
         return {"status": "fallback", "features": fallback_features}
 
 class GenerateFeatureRequest(BaseModel):

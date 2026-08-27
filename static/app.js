@@ -241,6 +241,8 @@ function setupEventListeners() {
     
     document.getElementById('btn-open-planning').addEventListener('click', () => {
         showPlanningState('initial');
+        const customInput = document.getElementById('planning-custom-input');
+        if (customInput) customInput.value = '';
         planningModal.classList.remove('hidden');
     });
     
@@ -916,6 +918,9 @@ async function runPlanningAnalysis() {
         return;
     }
     
+    const customInputEl = document.getElementById('planning-custom-input');
+    const customFeatureVal = customInputEl ? customInputEl.value.trim() : '';
+
     showPlanningState('loading-list');
     
     try {
@@ -925,7 +930,10 @@ async function runPlanningAnalysis() {
                 'Content-Type': 'application/json',
                 'X-Gemini-Key': state.apiKey
             },
-            body: JSON.stringify({ project_data: state.currentProject })
+            body: JSON.stringify({ 
+                project_data: state.currentProject,
+                custom_feature: customFeatureVal
+            })
         });
         
         const data = await response.json();

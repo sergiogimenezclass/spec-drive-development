@@ -299,9 +299,13 @@
                 <p>Gemini analizará tu documentación de producto y base de datos actual para estructurar las historias de usuario y criterios de aceptación específicos de cada característica del sistema.</p>
                 
                 <!-- Estado 1: Botón de análisis inicial -->
-                <div id="planning-state-initial" class="planning-state">
+                <div id="planning-state-initial" class="planning-state" style="display: flex; flex-direction: column; gap: 12px;">
+                    <div style="display: flex; flex-direction: column; gap: 6px; text-align: left; margin-bottom: 8px;">
+                        <label for="planning-custom-input" style="font-size: 13px; font-weight: 600; color: var(--text-primary);">¿Quieres proponer una funcionalidad específica? (Opcional)</label>
+                        <textarea id="planning-custom-input" placeholder="Ej: 'Pasarela de pago Stripe' o 'Notificaciones por WhatsApp'. Déjalo vacío si quieres que la IA analice tus especificaciones y te proponga ideas automáticamente." style="width: 100%; min-height: 80px; padding: 10px; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.25); color: var(--text-primary); font-family: inherit; font-size: 13px; resize: vertical; line-height: 1.5;"></textarea>
+                    </div>
                     <button id="btn-start-planning-analysis" class="btn btn-primary btn-full-width">
-                        <i class="fa-solid fa-magnifying-glass-chart"></i> Analizar Proyecto y Proponer Features
+                        <i class="fa-solid fa-magnifying-glass-chart"></i> Analizar y Desglosar Feature
                     </button>
                 </div>
                 
@@ -348,6 +352,6 @@
     <!-- Notificaciones flotantes -->
     <div id="toast-container" class="toast-container"></div>
 
-    <script src="app.js?v=2.0.9"></script>
+    <script src="app.js?v=2.1.0"></script>
 </body>
 </html>
