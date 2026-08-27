@@ -868,7 +868,7 @@ body {
 .workspace-editor-panel {
     display: flex;
     flex-direction: column;
-    background-color: rgba(15, 12, 27, 0.5);
+    background-color: var(--bg-surface);
     border-right: var(--glass-border);
 }
 .editor-header {
@@ -982,43 +982,55 @@ body {
     height: 100%;
     border: 1px solid var(--border-color);
     border-radius: 8px;
-    padding: 20px;
-    background-color: rgba(255, 255, 255, 0.02);
+    padding: 30px;
+    background-color: var(--bg-surface-solid);
+    box-shadow: var(--shadow-sm);
     overflow-y: auto;
-    line-height: 1.6;
+    line-height: 1.65;
 }
 .markdown-preview-pane h1, .markdown-preview-pane h2, .markdown-preview-pane h3 {
     font-family: var(--font-title);
-    margin-top: 16px;
-    margin-bottom: 12px;
+    margin-top: 24px;
+    margin-bottom: 14px;
+    color: var(--text-primary);
 }
 .markdown-preview-pane h1 {
-    font-size: 24px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    padding-bottom: 6px;
+    font-size: 26px;
+    border-bottom: 2px solid var(--border-color);
+    padding-bottom: 8px;
 }
-.markdown-preview-pane h2 { font-size: 18px; }
-.markdown-preview-pane p { margin-bottom: 12px; }
+.markdown-preview-pane h2 { 
+    font-size: 19px; 
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 4px;
+}
+.markdown-preview-pane p { margin-bottom: 14px; color: var(--text-secondary); }
 .markdown-preview-pane ul, .markdown-preview-pane ol {
     margin-left: 20px;
-    margin-bottom: 16px;
+    margin-bottom: 18px;
+    color: var(--text-secondary);
 }
 .markdown-preview-pane code {
-    background-color: rgba(255, 255, 255, 0.08);
-    padding: 2px 6px;
+    background-color: var(--bg-surface-hover);
+    border: 1px solid var(--border-color);
+    color: var(--primary-hover);
+    padding: 3px 6px;
     border-radius: 4px;
     font-family: var(--font-mono);
-    font-size: 12px;
+    font-size: 12.5px;
 }
 .markdown-preview-pane pre {
-    background-color: rgba(0, 0, 0, 0.3);
-    padding: 16px;
+    background-color: #110e1c;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    padding: 18px;
     border-radius: 8px;
     overflow-x: auto;
-    margin-bottom: 16px;
+    margin-bottom: 18px;
 }
 .markdown-preview-pane pre code {
     background-color: transparent;
+    border: none;
+    color: #e2e8f0;
     padding: 0;
 }
 
