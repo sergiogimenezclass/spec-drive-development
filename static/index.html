@@ -248,7 +248,7 @@
                                 Abrir en tu Editor Local
                             </button>
                             <button id="btn-open-planning" class="btn btn-border btn-full-width" style="display: flex; align-items: center; justify-content: center; gap: 8px;">
-                                <i class="fa-solid fa-folder-plus" style="color: var(--primary-color);"></i>
+                                <i class="fa-solid fa-folder-plus" style="color: var(--primary);"></i>
                                 Desglosar Features con IA
                             </button>
                         </div>
@@ -292,7 +292,7 @@
         <div class="modal-overlay" id="planning-modal-overlay"></div>
         <div class="modal-content glass-card">
             <div class="modal-header">
-                <h2><i class="fa-solid fa-compass-drafting" style="color: var(--primary-color);"></i> Planificación & Desglose de Features</h2>
+                <h2><i class="fa-solid fa-compass-drafting" style="color: var(--primary);"></i> Planificación & Desglose de Features</h2>
                 <button class="modal-close-btn" id="btn-close-planning-modal"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <div class="modal-body">
@@ -302,7 +302,7 @@
                 <div id="planning-state-initial" class="planning-state" style="display: flex; flex-direction: column; gap: 12px;">
                     <div style="display: flex; flex-direction: column; gap: 6px; text-align: left; margin-bottom: 8px;">
                         <label for="planning-custom-input" style="font-size: 13px; font-weight: 600; color: var(--text-primary);">¿Quieres proponer una funcionalidad específica? (Opcional)</label>
-                        <textarea id="planning-custom-input" placeholder="Ej: 'Pasarela de pago Stripe' o 'Notificaciones por WhatsApp'. Déjalo vacío si quieres que la IA analice tus especificaciones y te proponga ideas automáticamente." style="width: 100%; min-height: 80px; padding: 10px; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.25); color: var(--text-primary); font-family: inherit; font-size: 13px; resize: vertical; line-height: 1.5;"></textarea>
+                        <textarea id="planning-custom-input" placeholder="Ej: 'Pasarela de pago Stripe' o 'Notificaciones por WhatsApp'. Déjalo vacío si quieres que la IA analice tus especificaciones y te proponga ideas automáticamente." style="width: 100%; min-height: 80px; padding: 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color); background: var(--bg-surface-hover); color: var(--text-primary); font-family: inherit; font-size: 13px; resize: vertical; line-height: 1.5; outline: none; transition: border-color 0.2s;"></textarea>
                     </div>
                     <button id="btn-start-planning-analysis" class="btn btn-primary btn-full-width">
                         <i class="fa-solid fa-magnifying-glass-chart"></i> Analizar y Desglosar Feature
@@ -352,6 +352,6 @@
     <!-- Notificaciones flotantes -->
     <div id="toast-container" class="toast-container"></div>
 
-    <script src="app.js?v=2.1.2"></script>
+    <script src="app.js?v=2.1.3"></script>
 </body>
 </html>

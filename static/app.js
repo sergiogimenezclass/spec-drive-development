@@ -707,7 +707,7 @@ function renderSpecTree() {
             const folderItem = document.createElement('div');
             folderItem.className = 'spec-tree-folder';
             folderItem.style.cssText = "padding: 6px 16px; font-size: 12px; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 8px;";
-            folderItem.innerHTML = `<i class="fa-solid fa-folder-open" style="color: var(--primary-color); font-size: 11px;"></i> <span>features/${folderName}</span>`;
+            folderItem.innerHTML = `<i class="fa-solid fa-folder-open" style="color: var(--primary); font-size: 11px;"></i> <span>features/${folderName}</span>`;
             nav.appendChild(folderItem);
             
             folders[folderName].forEach(feat => {

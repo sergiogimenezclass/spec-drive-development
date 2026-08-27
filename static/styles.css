@@ -1478,7 +1478,7 @@ body {
 }
 
 .features-checklist-container {
-    background: rgba(0, 0, 0, 0.15);
+    background: var(--bg-surface-hover);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
     max-height: 250px;
@@ -1497,12 +1497,12 @@ body {
 }
 
 .feature-checklist-item:hover {
-    background: rgba(255, 255, 255, 0.03);
+    background: var(--border-color);
 }
 
 .feature-checklist-item input[type="checkbox"] {
     margin-top: 3px;
-    accent-color: var(--primary-color);
+    accent-color: var(--primary);
     cursor: pointer;
 }
 
@@ -1525,7 +1525,7 @@ body {
 
 .feature-item-folder {
     font-size: 10px;
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--bg-surface-solid);
     padding: 2px 6px;
     border-radius: 4px;
     color: var(--text-secondary);
@@ -1535,7 +1535,7 @@ body {
 }
 
 .generation-log {
-    background: rgba(0, 0, 0, 0.3);
+    background: #0f0c1b;
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
     padding: var(--spacing-md);
@@ -1570,9 +1570,9 @@ body {
 .spinner {
     width: 40px;
     height: 40px;
-    border: 3px solid rgba(255, 255, 255, 0.1);
+    border: 3px solid var(--border-color);
     border-radius: 50%;
-    border-top-color: var(--primary-color);
+    border-top-color: var(--primary);
     animation: spin 1s ease-in-out infinite;
 }
 

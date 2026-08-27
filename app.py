@@ -306,6 +306,51 @@ async def save_project(req: SaveProjectRequest):
         logger.error(f"Error al guardar proyecto: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+def parse_feature_metadata_from_file(filepath: str, folder: str, feat_id: str) -> dict:
+    name = feat_id.replace("-", " ").title()
+    description = f"Especificación para {name}."
+    try:
+        if os.path.exists(filepath):
+            with open(filepath, "r", encoding="utf-8") as f:
+                content = f.read()
+                lines = content.split("\n")
+                
+                # Buscar el primer título # o ##
+                found_name = False
+                for line in lines:
+                    line_strip = line.strip()
+                    if line_strip.startswith("#"):
+                        raw_name = line_strip.lstrip("#").strip()
+                        if ":" in raw_name:
+                            parts = raw_name.split(":", 1)
+                            raw_name = parts[1].strip()
+                        if raw_name:
+                            name = raw_name
+                            found_name = True
+                            break
+                            
+                # Buscar el primer párrafo no vacío para la descripción
+                found_title = False
+                for line in lines:
+                    line_strip = line.strip()
+                    if line_strip.startswith("#"):
+                        found_title = True
+                        continue
+                    if found_title and line_strip:
+                        if not line_strip.startswith("#") and not line_strip.startswith(">"):
+                            description = line_strip
+                            if len(description) > 120:
+                                description = description[:117] + "..."
+                            break
+    except Exception as e:
+        logger.error(f"Error parsing feature file metadata: {str(e)}")
+    return {
+        "id": feat_id,
+        "name": name,
+        "description": description,
+        "folder": folder
+    }
+
 @app.get("/api/load-project")
 async def load_project():
     if not os.path.exists(PROJECT_FILE):
@@ -314,9 +359,11 @@ async def load_project():
         with open(PROJECT_FILE, "r", encoding="utf-8") as f:
             project_data = json.load(f)
             
-        # Sincronizar specModules con los archivos reales en el disco si existen
+        # Sincronizar specModules y featuresList con los archivos reales en el disco si existen
         if "specModules" not in project_data:
             project_data["specModules"] = {}
+            
+        disk_features = []
             
         if os.path.exists(SPECS_DIR):
             for filename in os.listdir(SPECS_DIR):
@@ -336,14 +383,26 @@ async def load_project():
                     folder_path = os.path.join(features_dir, folder)
                     if os.path.isdir(folder_path):
                         for feat_file in os.listdir(folder_path):
-                            feat_path = os.path.join(folder_path, feat_file)
-                            if os.path.isfile(feat_path):
-                                name_key = f"features/{folder}/{feat_file.replace('.md', '')}"
-                                try:
-                                    with open(feat_path, "r", encoding="utf-8") as file_obj:
-                                        project_data["specModules"][name_key] = file_obj.read().strip()
-                                except Exception as e:
-                                    logger.error(f"Error leyendo feature en load_project: {str(e)}")
+                            if feat_file.endswith(".md"):
+                                feat_id = feat_file.replace(".md", "")
+                                feat_path = os.path.join(folder_path, feat_file)
+                                if os.path.isfile(feat_path):
+                                    name_key = f"features/{folder}/{feat_id}"
+                                    try:
+                                        with open(feat_path, "r", encoding="utf-8") as file_obj:
+                                            project_data["specModules"][name_key] = file_obj.read().strip()
+                                        
+                                        # Parsear metadatos e insertar en la lista
+                                        feat_metadata = parse_feature_metadata_from_file(feat_path, folder, feat_id)
+                                        disk_features.append(feat_metadata)
+                                    except Exception as e:
+                                        logger.error(f"Error leyendo feature en load_project: {str(e)}")
+                                        
+        # Actualizar la lista en project_data si encontramos features en el disco
+        if disk_features:
+            project_data["featuresList"] = disk_features
+        else:
+            project_data["featuresList"] = []
                                     
         return {"status": "success", "project": project_data}
     except Exception as e:
