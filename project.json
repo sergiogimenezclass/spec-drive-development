@@ -3,7 +3,7 @@
   "name": "Turnos",
   "seedIdea": "Vamos a hacer una aplicación de turnos para que se pueda reservar turnos. En este caso de mono usuario. Y para un solo proyecto. Puede ser para una peluquería, puede ser para un psicólogo, puede ser para reservar turnos para una clase. Pero algo sencillo de 1 a 1. Nada más, es lo que tenemos. Juan, al proceso.",
   "createdAt": 1787694862375,
-  "updatedAt": 1787871438937,
+  "updatedAt": 1787871880854,
   "answers": {
     "q_auth": "Email y Contraseña tradicional",
     "q_database": "Relacional (PostgreSQL/MySQL)",
@@ -55,34 +55,34 @@
   },
   "featuresList": [
     {
-      "id": "professional-auth",
-      "name": "Autenticación y Perfil del Profesional",
-      "description": "Permite al profesional registrarse, iniciar sesión de forma segura y gestionar sus datos de perfil y credenciales.",
-      "folder": "auth"
-    },
-    {
-      "id": "mp-setup",
-      "name": "Configuración de Integración con Mercado Pago",
-      "description": "Permite al profesional vincular su cuenta de Mercado Pago y definir si los turnos o servicios específicos requieren pago anticipado.",
+      "id": "appointment-payment-status",
+      "name": "Gestión de Estado de Turno por Pago",
+      "description": "**Categoría/Carpeta:** `payments`",
       "folder": "payments"
     },
     {
       "id": "mp-checkout-client",
       "name": "Checkout de Mercado Pago para Clientes",
-      "description": "Integra la pasarela de pago de Mercado Pago en el flujo de reserva, permitiendo al cliente completar el pago de su turno.",
+      "description": "Esta feature introduce la capacidad de procesar pagos en línea para los turnos reservados a través de la pasarela de ...",
+      "folder": "payments"
+    },
+    {
+      "id": "mp-setup",
+      "name": "Configuración de Integración con Mercado Pago",
+      "description": "**Categoría/Carpeta:** `payments`",
       "folder": "payments"
     },
     {
       "id": "mp-webhooks",
       "name": "Manejo de Webhooks de Mercado Pago",
-      "description": "Implementa un endpoint para recibir y procesar las notificaciones de estado de pago (webhooks) de Mercado Pago.",
+      "description": "**Categoría/Carpeta:** `payments`",
       "folder": "payments"
     },
     {
-      "id": "appointment-payment-status",
-      "name": "Gestión de Estado de Turno por Pago",
-      "description": "Actualiza automáticamente el estado de un turno (ej. 'pendiente de pago', 'confirmado', 'pago fallido') basándose en el resultado del pago recibido de Mercado Pago.",
-      "folder": "payments"
+      "id": "professional-auth",
+      "name": "Autenticación y Perfil del Profesional",
+      "description": "**Categoría/Carpeta:** `auth`",
+      "folder": "auth"
     }
   ]
 }

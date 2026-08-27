@@ -125,6 +125,7 @@ async function checkExistingProject() {
         if (data.status === 'success' && data.project) {
             state.currentProject = data.project;
             renderRecentProject(data.project);
+            loadWorkspace();
         } else {
             renderRecentProject(null);
         }
