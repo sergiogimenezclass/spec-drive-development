@@ -1127,15 +1127,20 @@ async def open_specs_folder():
         logger.error(f"Error al abrir la carpeta de specs: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/")
+async def serve_root():
+    index_path = os.path.join(static_dir, "index.html")
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
+    return JSONResponse(status_code=404, content={"message": "Frontend index.html not found"})
+
 # Servir index.html para todas las demás rutas no API (SPA routing fallback)
 @app.get("/{rest_of_path:path}")
 async def serve_spa(rest_of_path: str):
-    # Si intentan acceder a un archivo estático que existe, se sirve normalmente (se monta después en la app)
     file_path = os.path.join(static_dir, rest_of_path)
     if os.path.exists(file_path) and os.path.isfile(file_path):
         return FileResponse(file_path)
     
-    # De lo contrario, se sirve el index.html principal
     index_path = os.path.join(static_dir, "index.html")
     if os.path.exists(index_path):
         return FileResponse(index_path)
@@ -1143,8 +1148,8 @@ async def serve_spa(rest_of_path: str):
     return JSONResponse(status_code=404, content={"message": "Frontend static files not built yet"})
 
 # Montar los estáticos al final para permitir que las rutas de la API tengan prioridad
-app.mount("/", StaticFiles(directory=static_dir), name="static")
+app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("app:app", host="127.0.0.1", port=8000, reload=True)
+    uvicorn.run("app:app", host="127.0.0.1", port=8000, reload=True, reload_excludes=[".git/*", ".venv/*", "specs/*", "agendapro/*", "__pycache__/*"])
