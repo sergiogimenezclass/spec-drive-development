@@ -1051,16 +1051,45 @@ async function submitFeatureGeneration() {
     document.getElementById('generation-progress-text').innerText = `Proceso completado. ${completed} de ${total} features generadas con éxito.`;
     document.getElementById('planning-progress-fill').style.width = `100%`;
     
+    // Cargar proyecto completo sincronizado desde el servidor
+    try {
+        const loadResp = await fetch('/api/load-project');
+        const loadData = await loadResp.json();
+        if (loadData.status === 'success' && loadData.project) {
+            state.currentProject = loadData.project;
+        }
+    } catch (e) {
+        console.error("Error re-cargando proyecto:", e);
+    }
+
+    renderSpecTree();
+
+    // Seleccionar automáticamente la última feature generada para abrirla en el editor
+    if (featuresToGenerate.length > 0) {
+        const lastFeat = featuresToGenerate[featuresToGenerate.length - 1];
+        const lastKey = `features/${lastFeat.folder}/${lastFeat.id}`;
+        selectSpecFile(lastKey);
+    }
+
+    showToast(`¡Proceso completado! ${completed} de ${total} features generadas.`, "success");
+
+    const planningModal = document.getElementById('planning-modal');
     const closeBtn = document.createElement('button');
-    closeBtn.className = 'btn btn-primary btn-sm';
+    closeBtn.className = 'btn btn-primary btn-full-width';
     closeBtn.style.marginTop = '16px';
-    closeBtn.innerText = 'Cerrar y Ver en Workspace';
+    closeBtn.innerHTML = '<i class="fa-solid fa-check"></i> Cerrar y Ver en Workspace';
     closeBtn.addEventListener('click', () => {
-        document.getElementById('planning-modal').classList.add('hidden');
-        renderSpecTree();
+        planningModal.classList.add('hidden');
+        showPlanningState('initial');
     });
     logContainer.appendChild(closeBtn);
     logContainer.scrollTop = logContainer.scrollHeight;
-    
-    renderSpecTree();
+
+    // Auto-cerrar el modal suavemente tras 1.2s para una UX óptima
+    setTimeout(() => {
+        if (!planningModal.classList.contains('hidden')) {
+            planningModal.classList.add('hidden');
+            showPlanningState('initial');
+        }
+    }, 1200);
 }
