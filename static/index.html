@@ -34,7 +34,7 @@
         <!-- HEADER PRINCIPAL -->
         <header class="app-header">
             <div class="header-left">
-                <div class="logo">
+                <div class="logo" id="btn-header-logo" style="cursor: pointer;" title="Volver al Dashboard / Inicio">
                     <i class="fa-solid fa-microchip-heading"></i>
                     <span>Spec <mark>IDE</mark></span>
                 </div>
@@ -249,10 +249,15 @@
                     <!-- PANEL IZQUIERDO: ÁRBOL DE MÓDULOS SPEC -->
                     <aside class="workspace-sidebar">
                         <div class="sidebar-header">
-                            <h3>Estructura de Specs</h3>
-                            <button id="btn-export-specs" class="btn btn-primary btn-sm" title="Escribir archivos Markdown en carpeta local /specs">
-                                <i class="fa-solid fa-file-export"></i> Exportar
-                            </button>
+                            <h3>Specs</h3>
+                            <div style="display: flex; gap: 6px;">
+                                <button id="btn-switch-project" class="btn btn-border btn-sm" title="Volver al Dashboard / Inicio de Proyectos">
+                                    <i class="fa-solid fa-house"></i> Inicio
+                                </button>
+                                <button id="btn-export-specs" class="btn btn-primary btn-sm" title="Escribir archivos Markdown en carpeta local /specs">
+                                    <i class="fa-solid fa-file-export"></i> Exportar
+                                </button>
+                            </div>
                         </div>
                         <div class="sidebar-planning-action" style="padding: var(--spacing-md); border-bottom: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 8px;">
                             <button id="btn-open-in-editor" class="btn btn-primary btn-full-width" style="display: flex; align-items: center; justify-content: center; gap: 8px;">
@@ -367,6 +372,6 @@
     <!-- Notificaciones flotantes -->
     <div id="toast-container" class="toast-container"></div>
 
-    <script src="app.js?v=2.2.0"></script>
+    <script src="app.js?v=2.2.1"></script>
 </body>
 </html>

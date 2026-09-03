@@ -63,7 +63,10 @@ async function initApp() {
     // Verificar si el backend tiene la API Key de Gemini configurada
     await checkBackendConfig();
     
-    // Intentar cargar proyecto existente del backend
+    // Cargar la ruta del proyecto activo en la interfaz
+    await checkProjectPath();
+
+    // Intentar cargar proyecto existente del backend (para mostrar en Dashboard)
     await checkExistingProject();
 }
 
@@ -77,6 +80,22 @@ function loadSettings() {
         state.isDarkTheme = true;
     } else if (theme === 'light') {
         state.isDarkTheme = false;
+    }
+}
+
+// Verificar la ruta activa del proyecto en el servidor
+async function checkProjectPath() {
+    try {
+        const response = await fetch('/api/project-path');
+        const data = await response.json();
+        if (data.status === 'success' && data.project_path) {
+            const input = document.getElementById('project-target-path-input');
+            if (input && !input.value) {
+                input.value = data.project_path;
+            }
+        }
+    } catch (e) {
+        console.error("Error obteniendo la ruta del proyecto:", e);
     }
 }
 
@@ -125,7 +144,8 @@ async function checkExistingProject() {
         if (data.status === 'success' && data.project) {
             state.currentProject = data.project;
             renderRecentProject(data.project);
-            loadWorkspace();
+            // NOTA: No llamamos automáticamente a loadWorkspace() para dar la opción
+            // de usar el Wizard para crear un nuevo proyecto o cambiar la carpeta.
         } else {
             renderRecentProject(null);
         }
@@ -220,6 +240,17 @@ function setupEventListeners() {
     document.getElementById('start-discovery-btn').addEventListener('click', () => {
         startDiscoveryFlow();
     });
+
+    // Navegación: Volver al Dashboard desde Logo y Botón de Inicio
+    const headerLogo = document.getElementById('btn-header-logo');
+    if (headerLogo) {
+        headerLogo.addEventListener('click', () => showScreen('screen-dashboard'));
+    }
+
+    const switchProjBtn = document.getElementById('btn-switch-project');
+    if (switchProjBtn) {
+        switchProjBtn.addEventListener('click', () => showScreen('screen-dashboard'));
+    }
 
     // Volver al Inicio desde el Wizard
     document.getElementById('back-to-dashboard-btn').addEventListener('click', () => {
