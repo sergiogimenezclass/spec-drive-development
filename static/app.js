@@ -287,6 +287,27 @@ function setupEventListeners() {
 
     // Copiar Prompt para Agente Dev (Open Code, Cursor, Cline, etc)
     document.getElementById('btn-copy-agent-prompt').addEventListener('click', () => copyAgentPrompt());
+
+    // Selector de carpeta destino nativa
+    const selectFolderBtn = document.getElementById('btn-select-folder-dialog');
+    if (selectFolderBtn) {
+        selectFolderBtn.addEventListener('click', async () => {
+            try {
+                showToast("Abriendo explorador de carpetas del sistema...", "info");
+                const response = await fetch('/api/select-folder-dialog', { method: 'POST' });
+                const data = await response.json();
+                if (data.status === 'success' && data.selected_path) {
+                    document.getElementById('project-target-path-input').value = data.selected_path;
+                    showToast(`Carpeta seleccionada: ${data.selected_path}`, "success");
+                } else if (data.status === 'manual_required') {
+                    showToast(data.message, "info");
+                }
+            } catch (e) {
+                console.error("Error al abrir diálogo de carpeta:", e);
+                showToast("Ingresa la ruta manualmente en el campo de texto.", "info");
+            }
+        });
+    }
 }
 
 // Alternar pantallas del SPA
@@ -349,6 +370,25 @@ async function startDiscoveryFlow() {
     if (!state.apiKey && !state.hasBackendApiKey) {
         showToast("Es necesario ingresar una API Key de Gemini en el Header o configurarla en el servidor", "error");
         return;
+    }
+
+    // Configurar carpeta destino si fue ingresada por el usuario
+    const targetPathInput = document.getElementById('project-target-path-input');
+    const customTargetPath = targetPathInput ? targetPathInput.value.trim() : '';
+    if (customTargetPath) {
+        try {
+            const setResp = await fetch('/api/set-project-path', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ project_path: customTargetPath })
+            });
+            const setJson = await setResp.json();
+            if (setJson.status === 'success') {
+                showToast(`Carpeta destino del proyecto: ${setJson.project_name}`, "info");
+            }
+        } catch (setErr) {
+            console.error("Error configurando ruta destino:", setErr);
+        }
     }
     
     // Inicializar estado del proyecto

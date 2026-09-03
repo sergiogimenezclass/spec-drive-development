@@ -93,6 +93,18 @@
                                 <input type="text" id="project-name-input" placeholder="Ej: TaskFlow, FitLife App, PayBlock...">
                             </div>
                             <div class="form-group">
+                                <label for="project-target-path-input">Carpeta Destino en Disco (Opcional)</label>
+                                <div style="display: flex; gap: 8px;">
+                                    <input type="text" id="project-target-path-input" placeholder="Ej: /home/usuario/proyectos/mi-app" title="Ruta absoluta de la carpeta del proyecto en tu disco duro">
+                                    <button type="button" id="btn-select-folder-dialog" class="btn btn-border" style="white-space: nowrap;" title="Abrir explorador de carpetas del sistema">
+                                        <i class="fa-solid fa-folder-open"></i> Explorar
+                                    </button>
+                                </div>
+                                <span style="font-size: 11px; color: var(--text-secondary); margin-top: 4px; display: block;">
+                                    Si la dejas vacía, se usará la carpeta del proyecto activo en el servidor.
+                                </span>
+                            </div>
+                            <div class="form-group">
                                 <label for="project-seed-idea">Describe tu idea en una frase</label>
                                 <textarea id="project-seed-idea" placeholder="Ej: Quiero una aplicación móvil para que usuarios puedan registrar sus entrenamientos diarios y competir en tablas de posiciones..."></textarea>
                             </div>
@@ -355,6 +367,6 @@
     <!-- Notificaciones flotantes -->
     <div id="toast-container" class="toast-container"></div>
 
-    <script src="app.js?v=2.1.7"></script>
+    <script src="app.js?v=2.2.0"></script>
 </body>
 </html>

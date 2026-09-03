@@ -31,8 +31,29 @@ load_dotenv()
 
 app = FastAPI(title="Spec IDE Backend")
 
-PROJECT_FILE = "project.json"
-SPECS_DIR = "specs"
+# Estado global de la ruta destino del proyecto activo
+TARGET_PROJECT_PATH = os.path.abspath(os.path.dirname(__file__))
+
+def get_target_project_path() -> str:
+    global TARGET_PROJECT_PATH
+    return TARGET_PROJECT_PATH
+
+def set_target_project_path(path: str) -> str:
+    global TARGET_PROJECT_PATH
+    abs_path = os.path.abspath(path.strip())
+    if not os.path.exists(abs_path):
+        os.makedirs(abs_path, exist_ok=True)
+    TARGET_PROJECT_PATH = abs_path
+    return TARGET_PROJECT_PATH
+
+def get_project_file() -> str:
+    return os.path.join(get_target_project_path(), "project.json")
+
+def get_specs_dir() -> str:
+    return os.path.join(get_target_project_path(), "specs")
+
+class SetProjectPathRequest(BaseModel):
+    project_path: str
 
 class IdeaAnalysisRequest(BaseModel):
     idea: str
@@ -91,6 +112,72 @@ if not os.path.exists(static_dir):
 async def get_config():
     has_key = bool(os.environ.get("GEMINI_API_KEY"))
     return {"hasApiKey": has_key}
+
+@app.get("/api/project-path")
+async def get_project_path():
+    current_path = get_target_project_path()
+    return {
+        "status": "success",
+        "project_path": current_path,
+        "project_name": os.path.basename(current_path) or current_path
+    }
+
+@app.post("/api/set-project-path")
+async def set_project_path_endpoint(req: SetProjectPathRequest):
+    try:
+        new_path = set_target_project_path(req.project_path)
+        return {
+            "status": "success",
+            "message": f"Ruta del proyecto configurada en: {new_path}",
+            "project_path": new_path,
+            "project_name": os.path.basename(new_path) or new_path
+        }
+    except Exception as e:
+        logger.error(f"Error al establecer ruta del proyecto: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Ruta inválida: {str(e)}")
+
+@app.post("/api/select-folder-dialog")
+async def select_folder_dialog():
+    try:
+        import subprocess
+        result = subprocess.run(
+            ["zenity", "--file-selection", "--directory", "--title=Selecciona la carpeta destino para el Proyecto Spec-First"],
+            capture_output=True, text=True, timeout=30
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            chosen_path = result.stdout.strip()
+            set_target_project_path(chosen_path)
+            return {
+                "status": "success",
+                "selected_path": chosen_path,
+                "project_name": os.path.basename(chosen_path) or chosen_path
+            }
+    except Exception as e:
+        logger.warning(f"No se pudo usar zenity para selección de carpeta: {str(e)}")
+
+    try:
+        import tkinter as tk
+        from tkinter import filedialog
+        root = tk.Tk()
+        root.withdraw()
+        root.attributes('-topmost', True)
+        chosen_path = filedialog.askdirectory(title="Selecciona la carpeta destino para el Proyecto Spec-First")
+        root.destroy()
+        if chosen_path:
+            set_target_project_path(chosen_path)
+            return {
+                "status": "success",
+                "selected_path": chosen_path,
+                "project_name": os.path.basename(chosen_path) or chosen_path
+            }
+    except Exception as tk_err:
+        logger.warning(f"No se pudo usar tkinter para selección de carpeta: {str(tk_err)}")
+        
+    return {
+        "status": "manual_required",
+        "message": "Ingresa la ruta absoluta manualmente en el campo de texto.",
+        "current_path": get_target_project_path()
+    }
 
 @app.post("/api/analyze-idea")
 async def analyze_idea(req: IdeaAnalysisRequest, x_gemini_key: str = Header(None)):
@@ -275,23 +362,26 @@ async def check_consistency(req: SaveProjectRequest, x_gemini_key: str = Header(
 async def save_project(req: SaveProjectRequest):
     project_data = req.project_data
     try:
-        # 1. Guardar el estado general del proyecto en project.json
-        with open(PROJECT_FILE, "w", encoding="utf-8") as f:
+        # 1. Guardar el estado general del proyecto en project.json de la carpeta destino
+        project_file = get_project_file()
+        specs_dir = get_specs_dir()
+        os.makedirs(os.path.dirname(project_file), exist_ok=True)
+        with open(project_file, "w", encoding="utf-8") as f:
             json.dump(project_data, f, ensure_ascii=False, indent=2)
             
         # 2. Sincronizar hacia los archivos individuales en el disco (specs/ y features/)
         spec_modules = project_data.get("specModules", {})
-        if os.path.exists(SPECS_DIR):
+        if os.path.exists(specs_dir):
             for name_key, content in spec_modules.items():
                 if not content:
                     continue
                 # Si es una feature dinámica (ej. features/auth/login)
                 if name_key.startswith("features/"):
-                    filepath = os.path.join(SPECS_DIR, f"{name_key}.md")
+                    filepath = os.path.join(specs_dir, f"{name_key}.md")
                 else:
                     # Guardamos openapi como .json y el resto como .md
                     ext = ".json" if name_key == "openapi" else ".md"
-                    filepath = os.path.join(SPECS_DIR, f"{name_key}{ext}")
+                    filepath = os.path.join(specs_dir, f"{name_key}{ext}")
                 
                 # Asegurar que existan los directorios
                 os.makedirs(os.path.dirname(filepath), exist_ok=True)
@@ -353,10 +443,12 @@ def parse_feature_metadata_from_file(filepath: str, folder: str, feat_id: str) -
 
 @app.get("/api/load-project")
 async def load_project():
-    if not os.path.exists(PROJECT_FILE):
+    project_file = get_project_file()
+    specs_dir = get_specs_dir()
+    if not os.path.exists(project_file):
         return {"status": "empty", "project": None}
     try:
-        with open(PROJECT_FILE, "r", encoding="utf-8") as f:
+        with open(project_file, "r", encoding="utf-8") as f:
             project_data = json.load(f)
             
         # Sincronizar specModules y featuresList con los archivos reales en el disco si existen
@@ -365,9 +457,9 @@ async def load_project():
             
         disk_features = []
             
-        if os.path.exists(SPECS_DIR):
-            for filename in os.listdir(SPECS_DIR):
-                filepath = os.path.join(SPECS_DIR, filename)
+        if os.path.exists(specs_dir):
+            for filename in os.listdir(specs_dir):
+                filepath = os.path.join(specs_dir, filename)
                 if os.path.isfile(filepath):
                     name_key = filename.replace(".md", "").replace(".json", "")
                     try:
@@ -377,7 +469,7 @@ async def load_project():
                         logger.error(f"Error leyendo archivo en load_project: {str(e)}")
             
             # Sincronizar también para las features dinámicas
-            features_dir = os.path.join(SPECS_DIR, "features")
+            features_dir = os.path.join(specs_dir, "features")
             if os.path.exists(features_dir):
                 for folder in os.listdir(features_dir):
                     folder_path = os.path.join(features_dir, folder)
@@ -403,7 +495,7 @@ async def load_project():
             project_data["featuresList"] = disk_features
         else:
             project_data["featuresList"] = []
-                                    
+                                     
         return {"status": "success", "project": project_data}
     except Exception as e:
         logger.error(f"Error al cargar el proyecto: {str(e)}")
@@ -423,10 +515,12 @@ def clean_markdown(text: str) -> str:
 @app.post("/api/export-specs")
 async def export_specs(req: SaveProjectRequest, x_gemini_key: str = Header(None)):
     model = get_gemini_model(x_gemini_key)
+    specs_dir = get_specs_dir()
+    project_file = get_project_file()
     
     # Creamos la carpeta de specs si no existe
-    if not os.path.exists(SPECS_DIR):
-        os.makedirs(SPECS_DIR)
+    if not os.path.exists(specs_dir):
+        os.makedirs(specs_dir, exist_ok=True)
         
     project = req.project_data
     if "specModules" not in project:
@@ -895,13 +989,14 @@ async def generate_feature(req: GenerateFeatureRequest, x_gemini_key: str = Head
     idea = project.get("seedIdea", "")
     spec_modules = project.get("specModules", {})
     
-    features_dir = os.path.join(SPECS_DIR, "features")
+    specs_dir = get_specs_dir()
+    features_dir = os.path.join(specs_dir, "features")
     folder = feature.get("folder", "general").strip().lower()
     feature_id = feature.get("id", "feature").strip().lower()
     
     folder_path = os.path.join(features_dir, folder)
     if not os.path.exists(folder_path):
-        os.makedirs(folder_path)
+        os.makedirs(folder_path, exist_ok=True)
         
     filepath = os.path.join(folder_path, f"{feature_id}.md")
     
@@ -972,7 +1067,9 @@ async def generate_feature(req: GenerateFeatureRequest, x_gemini_key: str = Head
         if not any(f.get("id") == feature_id for f in project["featuresList"]):
             project["featuresList"].append(feature)
             
-        with open(PROJECT_FILE, "w", encoding="utf-8") as f:
+        project_file = get_project_file()
+        os.makedirs(os.path.dirname(project_file), exist_ok=True)
+        with open(project_file, "w", encoding="utf-8") as f:
             json.dump(project, f, ensure_ascii=False, indent=2)
             
         return {
@@ -1064,7 +1161,9 @@ async def autocomplete_file(req: AutocompleteFileRequest, x_gemini_key: str = He
         content = clean_markdown(response.text.strip())
         
         # Escribir directamente en la carpeta specs
-        filepath = os.path.join(SPECS_DIR, filename)
+        specs_dir = get_specs_dir()
+        project_file = get_project_file()
+        filepath = os.path.join(specs_dir, filename)
         os.makedirs(os.path.dirname(filepath), exist_ok=True)
         with open(filepath, "w", encoding="utf-8") as f:
             f.write(content)
@@ -1076,7 +1175,8 @@ async def autocomplete_file(req: AutocompleteFileRequest, x_gemini_key: str = He
         name_key = filename.replace(".md", "").replace(".json", "")
         project["specModules"][name_key] = content
         
-        with open(PROJECT_FILE, "w", encoding="utf-8") as f:
+        os.makedirs(os.path.dirname(project_file), exist_ok=True)
+        with open(project_file, "w", encoding="utf-8") as f:
             json.dump(project, f, ensure_ascii=False, indent=2)
             
         return {
@@ -1096,7 +1196,7 @@ async def open_specs_folder():
     import shutil
     import subprocess
     
-    dir_path = SPECS_DIR
+    dir_path = get_specs_dir()
     if not os.path.exists(dir_path):
         os.makedirs(dir_path, exist_ok=True)
         
