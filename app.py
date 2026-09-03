@@ -712,7 +712,7 @@ async def export_specs(req: SaveProjectRequest, x_gemini_key: str = Header(None)
         
     # Plantillas de fallback para los archivos
     for filename in files_to_generate:
-        filepath = os.path.join(SPECS_DIR, filename)
+        filepath = os.path.join(specs_dir, filename)
         content = ""
         
         # Si fue generado por la IA, lo usamos
@@ -873,10 +873,10 @@ async def export_specs(req: SaveProjectRequest, x_gemini_key: str = Header(None)
             
     # Guardar el proyecto con los specModules cargados en project.json
     try:
-        with open(PROJECT_FILE, "w", encoding="utf-8") as f:
+        with open(project_file, "w", encoding="utf-8") as f:
             json.dump(project, f, ensure_ascii=False, indent=2)
     except Exception as e:
-        logger.error(f"Error escribiendo en {PROJECT_FILE} en export_specs: {str(e)}")
+        logger.error(f"Error escribiendo en {project_file} en export_specs: {str(e)}")
         
     return {
         "status": "success",
