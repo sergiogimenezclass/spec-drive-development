@@ -284,6 +284,9 @@ function setupEventListeners() {
 
     // Completar con IA en el editor
     document.getElementById('btn-ai-autocomplete').addEventListener('click', autocompleteActiveSection);
+
+    // Copiar Prompt para Agente Dev (Open Code, Cursor, Cline, etc)
+    document.getElementById('btn-copy-agent-prompt').addEventListener('click', () => copyAgentPrompt());
 }
 
 // Alternar pantallas del SPA
@@ -824,6 +827,45 @@ async function autocompleteActiveSection() {
     } catch (e) {
         console.error(e);
         showToast("Error al autocompletar sección con la IA", "error");
+    }
+}
+
+// Generar y copiar un prompt formateado para Open Code / Cursor / Cline
+function copyAgentPrompt(overrideSpecKey = null) {
+    const fileKey = overrideSpecKey || state.activeSpecFile;
+    if (!fileKey) {
+        showToast("Selecciona un archivo de especificación primero", "info");
+        return;
+    }
+    
+    let relPath = fileKey;
+    if (!relPath.endsWith('.md') && !relPath.endsWith('.json')) {
+        relPath += '.md';
+    }
+    if (!relPath.startsWith('specs/')) {
+        relPath = `specs/${relPath}`;
+    }
+    
+    let promptText = "";
+    if (relPath.includes("features/")) {
+        promptText = `Tu Fuente Única de Verdad es la carpeta /specs del proyecto. Lee detenidamente la especificación de feature en "${relPath}" e implementa las Historias de Usuario, Criterios de Aceptación (GIVEN/WHEN/THEN) y Casos de Error en el código de la aplicación dentro de /agendapro.`;
+    } else if (relPath.includes("database")) {
+        promptText = `Lee la especificación de base de datos en "${relPath}" y aplica los cambios en los esquemas, migraciones o modelos de datos del proyecto dentro de /agendapro.`;
+    } else if (relPath.includes("api") || relPath.includes("openapi")) {
+        promptText = `Lee la especificación de la API en "${relPath}" e implementa o actualiza los endpoints, controladores y validaciones de entrada en /agendapro.`;
+    } else {
+        promptText = `Lee la especificación en "${relPath}" e implementa o ajusta el código correspondiente en la aplicación dentro de /agendapro siguiendo las reglas del proyecto.`;
+    }
+    
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(promptText).then(() => {
+            showToast("📋 ¡Prompt copiado al portapapeles! Pegalo en Open Code o Cursor.", "success");
+        }).catch(err => {
+            console.error("Error al copiar al portapapeles:", err);
+            showToast("Prompt generado. Revisa la consola.", "info");
+        });
+    } else {
+        showToast("¡Prompt generado! " + promptText, "info");
     }
 }
 
