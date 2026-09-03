@@ -138,46 +138,50 @@ async def set_project_path_endpoint(req: SetProjectPathRequest):
 
 @app.post("/api/select-folder-dialog")
 async def select_folder_dialog():
-    try:
-        import subprocess
-        result = subprocess.run(
-            ["zenity", "--file-selection", "--directory", "--title=Selecciona la carpeta destino para el Proyecto Spec-First"],
-            capture_output=True, text=True, timeout=30
-        )
-        if result.returncode == 0 and result.stdout.strip():
-            chosen_path = result.stdout.strip()
-            set_target_project_path(chosen_path)
-            return {
-                "status": "success",
-                "selected_path": chosen_path,
-                "project_name": os.path.basename(chosen_path) or chosen_path
-            }
-    except Exception as e:
-        logger.warning(f"No se pudo usar zenity para selección de carpeta: {str(e)}")
+    import subprocess
+    import asyncio
 
-    try:
-        import tkinter as tk
-        from tkinter import filedialog
-        root = tk.Tk()
-        root.withdraw()
-        root.attributes('-topmost', True)
-        chosen_path = filedialog.askdirectory(title="Selecciona la carpeta destino para el Proyecto Spec-First")
-        root.destroy()
-        if chosen_path:
-            set_target_project_path(chosen_path)
-            return {
-                "status": "success",
-                "selected_path": chosen_path,
-                "project_name": os.path.basename(chosen_path) or chosen_path
-            }
-    except Exception as tk_err:
-        logger.warning(f"No se pudo usar tkinter para selección de carpeta: {str(tk_err)}")
-        
-    return {
-        "status": "manual_required",
-        "message": "Ingresa la ruta absoluta manualmente en el campo de texto.",
-        "current_path": get_target_project_path()
-    }
+    def _open_dialog():
+        # 1. Intentar con zenity
+        try:
+            result = subprocess.run(
+                ["zenity", "--file-selection", "--directory", "--title=Selecciona la carpeta destino para el Proyecto Spec-First"],
+                capture_output=True, text=True, timeout=300
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                return {"status": "success", "selected_path": result.stdout.strip()}
+            elif result.returncode != 0:
+                return {"status": "cancelled", "message": "Selección de carpeta cancelada por el usuario."}
+        except subprocess.TimeoutExpired:
+            logger.warning("Diálogo zenity excedió tiempo de espera")
+            return {"status": "cancelled", "message": "Tiempo de espera agotado al seleccionar carpeta."}
+        except Exception as e:
+            logger.warning(f"No se pudo usar zenity: {str(e)}")
+
+        # 2. Fallback: intentar con kdialog
+        try:
+            result = subprocess.run(
+                ["kdialog", "--getexistingdirectory", os.path.expanduser("~"), "--title", "Selecciona la carpeta destino"],
+                capture_output=True, text=True, timeout=300
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                return {"status": "success", "selected_path": result.stdout.strip()}
+            elif result.returncode != 0:
+                return {"status": "cancelled", "message": "Selección de carpeta cancelada por el usuario."}
+        except Exception as e:
+            logger.warning(f"No se pudo usar kdialog: {str(e)}")
+
+        return {
+            "status": "manual_required",
+            "message": "Escribe directamente la ruta de la carpeta en el campo de texto.",
+            "current_path": get_target_project_path()
+        }
+
+    res = await asyncio.to_thread(_open_dialog)
+    if res.get("status") == "success":
+        set_target_project_path(res["selected_path"])
+        res["project_name"] = os.path.basename(res["selected_path"]) or res["selected_path"]
+    return res
 
 @app.post("/api/analyze-idea")
 async def analyze_idea(req: IdeaAnalysisRequest, x_gemini_key: str = Header(None)):

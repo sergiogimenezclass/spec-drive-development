@@ -330,6 +330,8 @@ function setupEventListeners() {
                 if (data.status === 'success' && data.selected_path) {
                     document.getElementById('project-target-path-input').value = data.selected_path;
                     showToast(`Carpeta seleccionada: ${data.selected_path}`, "success");
+                } else if (data.status === 'cancelled') {
+                    showToast(data.message || "Selección de carpeta cancelada.", "info");
                 } else if (data.status === 'manual_required') {
                     showToast(data.message, "info");
                 }
