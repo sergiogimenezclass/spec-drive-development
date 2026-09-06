@@ -545,6 +545,20 @@ async def export_specs(req: SaveProjectRequest, x_gemini_key: str = Header(None)
     generated_files = []
     ai_markdowns = {}
     
+    def save_single_spec(fname: str, raw_content: str):
+        cleaned = clean_markdown(raw_content)
+        ai_markdowns[fname] = cleaned
+        filepath = os.path.join(specs_dir, fname)
+        try:
+            with open(filepath, "w", encoding="utf-8") as f:
+                f.write(cleaned.strip())
+            if fname not in generated_files:
+                generated_files.append(fname)
+            project["specModules"][fname.replace(".md", "").replace(".json", "")] = cleaned.strip()
+            logger.info(f"Guardado inmediato en disco: {filepath}")
+        except Exception as err:
+            logger.error(f"Error escribiendo {fname} en disco: {str(err)}")
+
     # 1. Generar product.md
     try:
         prod_prompt = f"""
@@ -565,7 +579,7 @@ async def export_specs(req: SaveProjectRequest, x_gemini_key: str = Header(None)
         """
         logger.info("Generando product.md por IA...")
         resp = model.generate_content(prod_prompt)
-        ai_markdowns["product.md"] = clean_markdown(resp.text)
+        save_single_spec("product.md", resp.text)
     except Exception as e:
         logger.error(f"Error generando product.md por IA: {str(e)}")
 
@@ -587,7 +601,7 @@ async def export_specs(req: SaveProjectRequest, x_gemini_key: str = Header(None)
         """
         logger.info("Generando architecture.md por IA...")
         resp = model.generate_content(arch_prompt)
-        ai_markdowns["architecture.md"] = clean_markdown(resp.text)
+        save_single_spec("architecture.md", resp.text)
     except Exception as e:
         logger.error(f"Error generando architecture.md por IA: {str(e)}")
 
@@ -610,7 +624,7 @@ async def export_specs(req: SaveProjectRequest, x_gemini_key: str = Header(None)
         """
         logger.info("Generando database.md por IA...")
         resp = model.generate_content(db_prompt)
-        ai_markdowns["database.md"] = clean_markdown(resp.text)
+        save_single_spec("database.md", resp.text)
     except Exception as e:
         logger.error(f"Error generando database.md por IA: {str(e)}")
 
@@ -632,7 +646,7 @@ async def export_specs(req: SaveProjectRequest, x_gemini_key: str = Header(None)
         """
         logger.info("Generando api.md por IA...")
         resp = model.generate_content(api_prompt)
-        ai_markdowns["api.md"] = clean_markdown(resp.text)
+        save_single_spec("api.md", resp.text)
     except Exception as e:
         logger.error(f"Error generando api.md por IA: {str(e)}")
 
@@ -653,10 +667,10 @@ async def export_specs(req: SaveProjectRequest, x_gemini_key: str = Header(None)
         json_content = clean_markdown(resp.text)
         try:
             json.loads(json_content)
-            ai_markdowns["openapi.json"] = json_content
+            save_single_spec("openapi.json", json_content)
         except Exception as json_err:
             logger.error(f"El JSON generado para openapi.json no es válido: {str(json_err)}")
-            ai_markdowns["openapi.json"] = json.dumps({
+            default_json = json.dumps({
                 "openapi": "3.0.0",
                 "info": {
                     "title": project.get("name", "Proyecto Spec-First") + " API",
@@ -665,6 +679,7 @@ async def export_specs(req: SaveProjectRequest, x_gemini_key: str = Header(None)
                 },
                 "paths": {}
             }, indent=2)
+            save_single_spec("openapi.json", default_json)
     except Exception as e:
         logger.error(f"Error generando openapi.json por IA: {str(e)}")
 
@@ -683,7 +698,7 @@ async def export_specs(req: SaveProjectRequest, x_gemini_key: str = Header(None)
         """
         logger.info("Generando glossary.md por IA...")
         resp = model.generate_content(glossary_prompt)
-        ai_markdowns["glossary.md"] = clean_markdown(resp.text)
+        save_single_spec("glossary.md", resp.text)
     except Exception as e:
         logger.error(f"Error generando glossary.md por IA: {str(e)}")
 
@@ -706,7 +721,7 @@ async def export_specs(req: SaveProjectRequest, x_gemini_key: str = Header(None)
         """
         logger.info("Generando agents.md por IA...")
         resp = model.generate_content(agents_prompt)
-        ai_markdowns["agents.md"] = clean_markdown(resp.text)
+        save_single_spec("agents.md", resp.text)
     except Exception as e:
         logger.error(f"Error generando agents.md por IA: {str(e)}")
         
