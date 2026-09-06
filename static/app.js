@@ -588,7 +588,8 @@ function setupEventListeners() {
         btn.addEventListener('click', () => {
             tabBtns.forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
-            renderOnboardingGrid(btn.dataset.category);
+            const targetCategory = btn.dataset.category || btn.dataset.tab || 'all';
+            renderOnboardingGrid(targetCategory);
         });
     });
 
@@ -1432,7 +1433,7 @@ function renderOnboardingGrid(filterCategory = 'all') {
 
     Object.keys(SPEC_DOCS).forEach(fname => {
         const doc = SPEC_DOCS[fname];
-        if (filterCategory !== 'all' && doc.category !== filterCategory) return;
+        if (filterCategory && filterCategory !== 'all' && doc.category !== filterCategory) return;
 
         const card = document.createElement('div');
         card.className = 'onboarding-card';
@@ -1451,21 +1452,8 @@ function renderOnboardingGrid(filterCategory = 'all') {
             </div>
             <div class="onboarding-card-footer">
                 <span><i class="fa-solid fa-microchip"></i> Consumidor: <strong>${doc.consumer}</strong></span>
-                <button class="btn btn-border btn-sm open-spec-btn" data-file="${fname}" style="font-size: 11px; padding: 2px 8px;">
-                    Ver Módulo <i class="fa-solid fa-arrow-right"></i>
-                </button>
             </div>
         `;
-
-        const openBtn = card.querySelector('.open-spec-btn');
-        if (openBtn) {
-            openBtn.addEventListener('click', () => {
-                const onboardingModal = document.getElementById('onboarding-modal');
-                if (onboardingModal) onboardingModal.classList.add('hidden');
-                loadWorkspace();
-                selectSpecFile(fname);
-            });
-        }
 
         container.appendChild(card);
     });
