@@ -502,6 +502,7 @@ function setupEventListeners() {
 
     document.getElementById('save-api-key-btn').addEventListener('click', saveKeyAction);
     document.getElementById('gemini-api-key').addEventListener('change', saveKeyAction);
+    document.getElementById('btn-open-keys-modal')?.addEventListener('click', () => openQuotaModal('Configuración de Claves de IA (Principal y Resguardo)'));
 
     // Selección de Plantilla Presets
     const chips = document.querySelectorAll('.preset-chip');
