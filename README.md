@@ -8,30 +8,32 @@ El resultado es una **Fuente Única de Verdad (SSOT - Single Source of Truth)** 
 
 ## 🌟 Características Principales
 
-*   **🎙️ Entrevista de Descubrimiento Adaptativa:** Ingresa una idea semilla de software y la IA estructurará el dominio, tipo de producto, actores, MVP y un set de preguntas inteligentes y condicionales para refinar el diseño.
-*   **⚡ Doble Camino de Generación:**
-    *   *Camino 1 (Generación Directa):* Si tienes claro el proyecto, la IA escribe todas las especificaciones de inmediato a partir de tu idea.
-    *   *Camino 2 (Entrevista Guiada):* Un flujo interactivo paso a paso para refinar dudas del negocio con IA antes de redactar.
-*   **📂 Árbol de Especificaciones Técnicas (18 Módulos):** Genera e integra contratos de API, esquemas físicos de bases de datos, diagramas y reglas de negocio, incluyendo:
+*   **💬 Modo 1: Explore Chat + Wizard Inteligente (Recomendado):**
+    *   Mantén una charla informal y libre con el **Spec Copilot** sobre la idea de tu software antes de redactar especificaciones.
+    *   Con un solo clic en **`[ 📋 Revisar Cuestionario & Redactar Specs ]`**, la IA extrae automáticamente las decisiones de arquitectura (`/api/explore-extract-answers`) y pre-llena el Cuestionario Técnico en 30 segundos.
+*   **⚡ Modo 2: Generación Directa (Sin Chat):**
+    *   Si tienes claro el alcance, omite la conversación e ingresa directamente al cuestionario o genera las especificaciones de inmediato.
+*   **📁 Gestión Multi-Proyecto e Aislamiento Físico:**
+    *   Creación automática de carpetas dedicadas por proyecto (ej: `./projects/mi-sistema/`) o especificación de rutas personalizadas en cualquier parte de tu disco duro.
+    *   Persistencia automática del proyecto activo (`.active_project.json`) y panel de navegación de proyectos recientes (`/api/recent-projects`) para alternar fácilmente entre proyectos sin perder datos.
+    *   Persistencia del historial conversacional conversando con **Spec Copilot** en `chat_history.json` dentro de cada carpeta de proyecto.
+*   **📂 Árbol de Especificaciones Técnicas (17 Módulos):** Genera e integra contratos de API, esquemas físicos de bases de datos, diagramas y reglas de negocio:
     *   `product.md` (con reglas de negocio críticas e inquebrantables).
     *   `database.md` (con esquema físico completo en sintaxis **Prisma DSL** listo para copiar).
     *   `openapi.json` (especificación de API interactiva en formato **OpenAPI 3.0** nativo).
     *   `agents.md` (instrucciones y reglas de estilos técnicos para agentes autónomos).
-*   **🗺️ Fase de Planificación & Desglose de Features:** Un sub-módulo interactivo dentro del Workspace que analiza el diseño y genera fichas de historias de usuario con criterios de aceptación detallados y casos borde (edge cases) guardados en carpetas físicas temáticas (ej: `/specs/features/auth/login.md`).
-*   **📊 Diagramas Dinámicos en Mermaid.js:** Visualiza flujos de usuario, diagramas de base de datos entidad-relación e infraestructura sin salir del navegador.
-*   **🛡️ Linter de Consistencia e Inconsistencias:** Revisa que el diseño de tus archivos no tenga contradicciones arquitectónicas ni fallos lógicos graves.
+*   **🗺️ Planificación & Desglose de Features:** Analiza el diseño general y genera fichas de historias de usuario con criterios de aceptación detallados y casos borde (edge cases) en carpetas físicas temáticas (ej: `/specs/features/auth/login.md`).
+*   **🤖 Spec Copilot Integrado & Pantalla Completa:** Asistente conversacional de IA conectado directamente a las especificaciones activas del proyecto, expandible a modo pantalla completa.
 
 ---
 
 ## 🚀 Guía de Instalación Paso a Paso
 
-Sigue estos pasos para instalar y ejecutar Spec IDE de forma local en tu computadora:
-
 ### 1. Prerrequisitos
 Asegúrate de contar con los siguientes elementos instalados en tu sistema:
 *   **Python 3.10 o superior** (compruébalo ejecutando `python3 --version` o `python --version`).
 *   **Git** instalado.
-*   Una conexión a internet para conectar con la API de Google Gemini.
+*   Una API Key de **Google Gemini** ([Google AI Studio](https://aistudio.google.com/)).
 
 ### 2. Clonar el Repositorio
 Abre tu terminal y clona el proyecto en tu máquina local:
@@ -40,27 +42,22 @@ git clone https://github.com/sergiogimenezclass/spec-drive-development.git
 cd spec-drive-development
 ```
 
-### 3. Crear y Activar el Entorno Virtual (Recomendado)
-Es altamente recomendable aislar las dependencias utilizando un entorno virtual de Python:
+### 3. Crear y Activar el Entorno Virtual
+```bash
+# Linux / macOS
+python3 -m venv .venv
+source .venv/bin/activate
 
-*   **En Linux / macOS:**
-    ```bash
-    python3 -m venv .venv
-    source .venv/bin/activate
-    ```
-*   **En Windows (Command Prompt):**
-    ```cmd
-    python -m venv .venv
-    .venv\Scripts\activate
-    ```
-*   **En Windows (PowerShell):**
-    ```powershell
-    python -m venv .venv
-    .venv\Scripts\Activate.ps1
-    ```
+# Windows (CMD)
+python -m venv .venv
+.venv\Scripts\activate
+
+# Windows (PowerShell)
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+```
 
 ### 4. Instalar las Dependencias
-Una vez activado el entorno virtual, instala los paquetes requeridos especificados en `requirements.txt`:
 ```bash
 pip install --upgrade pip
 pip install -r requirements.txt
@@ -68,77 +65,52 @@ pip install -r requirements.txt
 
 ---
 
-## ⚙️ Guía de Configuración de la API de Gemini
+## ⚙️ Configuración de la API Key de Gemini
 
-Para que la IA funcione, Spec IDE necesita conectarse con los servicios de Google Gemini. Tienes dos maneras de configurar tu API Key:
+Tienes dos alternativas para configurar tu clave de Google AI Studio:
 
-### Opción A: Mediante Archivo `.env` (Recomendado y Permanente)
-Esta opción te evita tener que introducir la clave en la interfaz gráfica web cada vez que inicies el servidor:
+### Opción A: Archivo `.env` (Recomendado)
+Crea un archivo `.env` en la raíz del proyecto:
+```env
+GEMINI_API_KEY=AIzaSy...tu_clave_api_real...
+```
 
-1.  Crea un archivo de texto llamado `.env` en la raíz del proyecto (junto a `app.py`).
-2.  Escribe el siguiente contenido reemplazando con tu clave real obtenida de [Google AI Studio](https://aistudio.google.com/):
-    ```env
-    GEMINI_API_KEY=AIzaSy...tu_clave_api_aqui...
-    ```
-3.  El servidor de FastAPI leerá y aplicará esta clave automáticamente al iniciarse.
-
-### Opción B: Directamente desde el Navegador (Temporal)
-1.  Inicia el servidor (ver sección siguiente).
-2.  Una vez cargada la aplicación en tu navegador, localiza el campo **API Key de Gemini** en la esquina superior derecha del header.
-3.  Pega tu clave y presiona el botón **Guardar**. Esta clave se guardará en el `localStorage` de tu navegador.
+### Opción B: Desde el Header de la Interfaz Web
+Ingresa tu clave en el campo **Gemini API Key...** en la esquina superior derecha del header y presiona **Guardar**.
 
 ---
 
 ## 💻 Guía de Uso del Sistema
 
-### Paso 1: Inicialización del Proyecto
-1.  Inicia el servidor local de desarrollo ejecutando:
-    ```bash
-    python app.py
-    ```
-2.  Abre tu navegador e ingresa a la dirección: **[http://127.0.0.1:8000](http://127.0.0.1:8000)**.
-3.  Verás el Dashboard principal de Spec IDE. Completa los dos campos iniciales:
-    *   **Nombre del Proyecto:** Ej: `MediciReserve`
-    *   **Idea Semilla:** Describe detalladamente la funcionalidad principal (ej: *"Una aplicación para la reserva de turnos médicos en línea con recordatorios por correo, asignación de médicos según especialidad y módulo de administración"*).
+### 1. Iniciar el Servidor Local
+```bash
+python app.py
+```
+Abre tu navegador en **[http://127.0.0.1:8000](http://127.0.0.1:8000)**.
 
-### Paso 2: Elegir tu Metodología (Selector de Caminos)
-En la parte inferior de la tarjeta del Dashboard, selecciona cómo proceder:
-*   **Camino 1: Generación Directa (Directa):** Ideal si quieres que la IA procese la idea de inmediato y cree todo el set de especificaciones técnicas.
-*   **Camino 2: Entrevista Guiada (Wizard):** La IA te hará preguntas adaptativas una a una. Una vez que decidas terminar o completes el cuestionario, se generarán las especificaciones basándose en tus respuestas.
+### 2. Crear un Proyecto y Seleccionar Metodología
+1. Ingresa el **Nombre del Proyecto** y la **Carpeta Destino** (opcional, por defecto creará `./projects/{slug}`).
+2. Describe tu **Idea Semilla**.
+3. Selecciona la Metodología:
+   - **Modo 1 (Explore Chat + Wizard Inteligente)**: Abre el Spec Copilot para conversar y explorar. Al finalizar presiona `[ 📋 Revisar Cuestionario & Redactar Specs ]` para pre-llenar las opciones y generar las especificaciones.
+   - **Modo 2 (Generación Directa)**: Redacta las especificaciones o completa el cuestionario inmediatamente sin charla previa.
 
-Presiona el botón de acción para iniciar el proceso. Al terminar la redacción de la IA, el sistema abrirá el **Workspace del IDE**.
-
-### Paso 3: Trabajando en el Workspace del IDE
-Una vez dentro del IDE, cuentas con tres paneles principales:
-
-#### A. Panel Lateral Izquierdo (Estructura de Specs)
-*   Visualiza todos los módulos técnicos creados (`product.md`, `database.md`, `openapi.json`, etc.).
-*   Los elementos marcados con un punto verde ya cuentan con información generada.
-*   Haz clic en cualquier archivo para cargarlo en el panel central de edición.
-*   Presiona el botón **Exportar** en la esquina superior para guardar físicamente todos los archivos Markdown en el directorio `/specs/` de tu repositorio local.
-
-#### B. Panel Central (Editor y Visualizador)
-*   **Pestaña Respuestas Guía:** Muestra los campos del formulario asociados a esa especificación para que modifiques o añadas respuestas personalizadas.
-*   **Pestaña Visualizar Markdown:** Carga el código Markdown raw para edición directa y muestra una previsualización de HTML a la derecha.
-*   **Boton "Completar con IA":** Si seleccionas una sección vacía, presiona este botón para que Gemini redacte esa especificación basándose en el contexto global del proyecto.
-*   **Boton "Guardar":** Guarda manualmente el estado actual del proyecto en el archivo `project.json` en disco.
-
-#### C. Panel Derecho (Herramientas del Inspector)
-*   **Diagramas:** Genera automáticamente diagramas de flujo de usuario, entidad-relación de base de datos o arquitectura en Mermaid.js a partir de tus especificaciones.
-*   **Linter IA:** Ejecuta auditorías sobre tus especificaciones para que la IA identifique vacíos o inconsistencias críticas.
-*   **Copiloto:** Chatea con un arquitecto de software virtual de IA que comprende el contexto de tus especificaciones abiertas.
+### 3. Navegación en el Workspace IDE
+- **Panel Izquierdo**: Explora los 17 archivos de especificación, agrega features y presiona **Exportar** para escribir los archivos Markdown en disco (`/specs/`).
+- **Panel Central**: Previsualiza el contenido renderizado en Markdown HTML.
+- **Panel Derecho (Spec Copilot)**: Chatea con el copiloto sobre las especificaciones del proyecto o expande el panel a pantalla completa.
 
 ---
 
-## 🗺️ Uso de la Fase de Planificación & Desglose de Features
+## 📡 Endpoints Principales de la API REST
 
-Una de las características más avanzadas es la capacidad de desglose granular en módulos de desarrollo (historias de usuario concretas):
-
-1.  Una vez generadas tus especificaciones base (Producto, Base de datos, etc.), presiona el botón **Desglosar Features con IA** ubicado al final de la barra lateral izquierda.
-2.  Se abrirá un modal flotante. Haz clic en **Analizar Proyecto y Proponer Features**.
-3.  La IA leerá tus especificaciones base y te sugerirá una lista de 8 a 10 features y módulos necesarios (ej: *Autenticación, Gestión de Turnos, Panel de Control, Notificaciones*).
-4.  Utiliza los checkboxes para seleccionar qué módulos deseas documentar y presiona **Generar Seleccionadas**.
-5.  Verás una barra de progreso y una consola con el log de escritura asíncrona de los archivos de feature.
-6.  Al finalizar, cierra el modal. Verás que en la barra lateral izquierda aparece una nueva sección jerárquica llamada **Features & Módulos** con carpetas y archivos individuales (ej. `features/auth/login`).
-7.  Al seleccionar uno de estos archivos, el editor se ajustará automáticamente a modo Markdown para que revises y edites la **User Story**, los **Criterios de Aceptación** y los **Casos Borde (Edge cases)** generados por la IA.
+| Endpoint | Método | Descripción |
+| :--- | :---: | :--- |
+| `/api/set-project-path` | `POST` | Configura y persiste la carpeta destino del proyecto en `.active_project.json`. |
+| `/api/recent-projects` | `GET` | Lista todos los proyectos escaneados en disco y cuál está activo. |
+| `/api/explore-extract-answers` | `POST` | Extrae decisiones de arquitectura en formato JSON a partir del chat de Explore. |
+| `/api/analyze-idea` | `POST` | Abstrae la idea semilla en dominio, actores y cuestionario adaptativo. |
+| `/api/export-specs` | `POST` | Genera y exporta físicamente todos los módulos `.md` y `openapi.json` a la carpeta `/specs/`. |
+| `/api/copilot-chat` | `POST` | Endpoint conversacional para el Spec Copilot con persistencia en `chat_history.json`. |
+| `/api/open-specs-folder` | `POST` | Abre la carpeta de especificaciones del proyecto en el explorador de archivos del SO. |nerados por la IA.
 8.  Al presionar **Exportar**, las carpetas temáticas y archivos se escribirán físicamente en disco bajo la ruta `/specs/features/[modulo]/[nombre].md`.
