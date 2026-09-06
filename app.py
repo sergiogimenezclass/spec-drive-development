@@ -148,7 +148,7 @@ def is_quota_error(err_msg: str) -> bool:
     return any(ind in msg_lower for ind in quota_indicators)
 
 def _get_fallback_candidates(current_model: str) -> List[str]:
-    all_models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-flash-latest", "gemini-3.1-pro-preview", "gemini-pro-latest"]
+    all_models = ["gemini-flash-latest", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.5-flash-lite", "gemini-3.1-pro-preview"]
     return [m for m in all_models if m != current_model]
 
 class GeminiChatSessionWrapper:
@@ -165,51 +165,37 @@ class GeminiChatSessionWrapper:
         except Exception as e:
             err_msg = str(e)
             err_lower = err_msg.lower()
+            current_m = getattr(self.model_wrapper, 'model_name', 'gemini-2.5-flash')
+            key_to_use = self.key_used or (self.model_wrapper.primary_key if self.model_wrapper and self.model_wrapper.primary_key else os.environ.get("GEMINI_API_KEY", "")).strip()
 
-            # Priorizar detección de cuota (429) antes de cualquier reintento de fallback
-            if is_quota_error(err_msg):
-                current_m = getattr(self.model_wrapper, 'model_name', '')
-                if "pro" in current_m.lower():
-                    logger.warning(f"Modelo Pro '{current_m}' sin cuota en plan gratuito. Intentando fallback a gemini-2.5-flash")
-                    key_to_use = self.key_used or (self.model_wrapper.primary_key if self.model_wrapper and self.model_wrapper.primary_key else os.environ.get("GEMINI_API_KEY", "")).strip()
-                    if key_to_use:
-                        try:
-                            genai.configure(api_key=key_to_use)
-                            m_fb = genai.GenerativeModel("gemini-2.5-flash")
-                            chat_fb = m_fb.start_chat(history=self.history, **self.kwargs)
-                            return chat_fb.send_message(content, **kwargs)
-                        except Exception as fb_e:
-                            logger.error(f"Fallback Pro -> Flash en chat falló: {fb_e}")
-                            err_msg = str(fb_e)
-
-                raise HTTPException(
-                    status_code=429,
-                    detail=f"⚠️ Límite de Cuota Alcanzado (429/Quota Exceeded): {err_msg}. Ingresa una clave de resguardo o cambia el modelo a Gemini 2.5 Flash en el header."
-                )
-
-            # Si el modelo no existe, 404 o no disponible en la clave de la cuenta
-            if "404" in err_lower or "not found" in err_lower or "no longer available" in err_lower or "unsupported" in err_lower:
-                current_m = getattr(self.model_wrapper, 'model_name', 'gemini-2.5-flash')
-                logger.warning(f"Error 404/Modelo no disponible en chat ('{current_m}'). Intentando fallback secuencial de modelos. Detalle: {err_msg}")
-
-                key_to_use = self.key_used or (self.model_wrapper.primary_key if self.model_wrapper and self.model_wrapper.primary_key else os.environ.get("GEMINI_API_KEY", "")).strip()
+            # Intentar fallback transparente a gemini-flash-latest u otros modelos disponibles antes de lanzar 429
+            if is_quota_error(err_msg) or "404" in err_lower or "not found" in err_lower or "unsupported" in err_lower:
+                logger.warning(f"Error en chat ('{current_m}'). Intentando fallback secuencial con modelos alternativos. Detalle: {err_msg}")
                 if key_to_use:
                     genai.configure(api_key=key_to_use)
                     for fb_model in _get_fallback_candidates(current_m):
                         try:
-                            logger.info(f"Reintentando chat con modelo de resguardo '{fb_model}'")
+                            logger.info(f"Reintentando chat con modelo alternativo '{fb_model}'")
                             m_fb = genai.GenerativeModel(fb_model)
                             chat_fb = m_fb.start_chat(history=self.history, **self.kwargs)
                             return chat_fb.send_message(content, **kwargs)
                         except Exception as fb_e:
                             fb_err_msg = str(fb_e)
                             logger.error(f"Fallback de chat con '{fb_model}' falló: {fb_err_msg}")
-                            if is_quota_error(fb_err_msg):
-                                raise HTTPException(
-                                    status_code=429,
-                                    detail=f"⚠️ Límite de Cuota Alcanzado (429/Quota Exceeded): {fb_err_msg}. Ingresa una clave de resguardo o cambia el modelo en la interfaz."
-                                )
                             err_msg = fb_err_msg
+
+            if is_quota_error(err_msg):
+                raise HTTPException(
+                    status_code=429,
+                    detail=f"⚠️ Límite de Cuota Alcanzado (429/Quota Exceeded): {err_msg}. Ingresa una clave de resguardo o cambia el modelo en el modal."
+                )
+
+            if "401" in err_msg or "invalid" in err_msg.lower() or "api_key" in err_msg.lower():
+                raise HTTPException(
+                    status_code=401,
+                    detail=f"⚠️ API Key no válida (401): {err_msg}"
+                )
+            raise HTTPException(status_code=500, detail=f"Error en Chat Copilot: {err_msg}")
 
             if "401" in err_msg or "invalid" in err_msg.lower() or "api_key" in err_msg.lower():
                 raise HTTPException(
