@@ -293,30 +293,35 @@ function setupTheme() {
     }
 }
 
-// Comprobar si hay un proyecto activo guardado en el servidor Python
+// Comprobar si hay un proyecto activo y obtener la lista de recientes
 async function checkExistingProject() {
     try {
-        const response = await fetch('/api/load-project');
-        const data = await response.json();
+        const [activeResp, recentResp] = await Promise.all([
+            fetch('/api/load-project'),
+            fetch('/api/recent-projects')
+        ]);
         
-        if (data.status === 'success' && data.project) {
-            state.currentProject = data.project;
-            renderRecentProject(data.project);
-            // NOTA: No llamamos automáticamente a loadWorkspace() para dar la opción
-            // de usar el Wizard para crear un nuevo proyecto o cambiar la carpeta.
-        } else {
-            renderRecentProject(null);
+        const activeData = await activeResp.json();
+        const recentData = await recentResp.json();
+
+        if (activeData.status === 'success' && activeData.project) {
+            state.currentProject = activeData.project;
         }
+
+        const projectsList = (recentData.status === 'success' && recentData.projects) ? recentData.projects : [];
+        renderRecentProjectsList(projectsList);
     } catch (e) {
-        console.error("Error cargando proyecto:", e);
-        renderRecentProject(null);
+        console.error("Error cargando proyecto y recientes:", e);
+        renderRecentProjectsList([]);
     }
 }
 
-// Mostrar proyecto en la lista de recientes
-function renderRecentProject(project) {
+// Mostrar listado de proyectos recientes en el Dashboard
+function renderRecentProjectsList(projects) {
     const container = document.getElementById('recent-projects-list');
-    if (!project) {
+    if (!container) return;
+
+    if (!projects || projects.length === 0) {
         container.innerHTML = `
             <div class="empty-projects-state">
                 <i class="fa-solid fa-diagram-project"></i>
@@ -325,29 +330,59 @@ function renderRecentProject(project) {
         `;
         return;
     }
-    
-    const dateStr = new Date(project.updatedAt || Date.now()).toLocaleDateString('es-ES', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-    });
-    
-    container.innerHTML = `
-        <div class="recent-project-item" id="btn-load-recent-project">
-            <div class="project-item-info">
-                <span class="project-item-title">${project.name}</span>
-                <span class="project-item-date">Modificado: ${dateStr}</span>
+
+    container.innerHTML = projects.map(proj => {
+        const dateStr = new Date(proj.updatedAt || Date.now()).toLocaleDateString('es-ES', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+        const activeBadge = proj.isActive 
+            ? `<span class="badge" style="background: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.4); font-size: 10px; padding: 2px 6px;">Activo</span>`
+            : '';
+
+        return `
+            <div class="recent-project-item ${proj.isActive ? 'active-project-card' : ''}" data-path="${proj.path}">
+                <div class="project-item-info">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span class="project-item-title">${proj.name}</span>
+                        ${activeBadge}
+                    </div>
+                    <span class="project-item-date">Modificado: ${dateStr} &bull; <span style="font-family: monospace; font-size: 10px; color: var(--text-muted);">${proj.path}</span></span>
+                </div>
+                <div class="project-item-action">
+                    <i class="fa-solid fa-chevron-right"></i>
+                </div>
             </div>
-            <div class="project-item-action">
-                <i class="fa-solid fa-chevron-right"></i>
-            </div>
-        </div>
-    `;
-    
-    document.getElementById('btn-load-recent-project').addEventListener('click', () => {
-        loadWorkspace();
+        `;
+    }).join('');
+
+    container.querySelectorAll('.recent-project-item').forEach(item => {
+        item.addEventListener('click', async () => {
+            const targetPath = item.getAttribute('data-path');
+            if (targetPath) {
+                try {
+                    await fetch('/api/set-project-path', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ project_path: targetPath })
+                    });
+                    
+                    const loadResp = await fetch('/api/load-project');
+                    const loadData = await loadResp.json();
+                    if (loadData.status === 'success' && loadData.project) {
+                        state.currentProject = loadData.project;
+                    }
+                    showToast(`Cargando proyecto "${state.currentProject.name}"`, "info");
+                    loadWorkspace();
+                } catch (err) {
+                    console.error("Error cambiando a proyecto:", err);
+                    showToast("No se pudo cargar el proyecto seleccionado.", "error");
+                }
+            }
+        });
     });
 }
 
@@ -628,23 +663,27 @@ async function startDiscoveryFlow() {
         return;
     }
 
-    // Configurar carpeta destino si fue ingresada por el usuario
+    // Configurar carpeta destino (o crear subcarpeta dedicada basada en el slug del nombre)
     const targetPathInput = document.getElementById('project-target-path-input');
-    const customTargetPath = targetPathInput ? targetPathInput.value.trim() : '';
-    if (customTargetPath) {
-        try {
-            const setResp = await fetch('/api/set-project-path', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ project_path: customTargetPath })
-            });
-            const setJson = await setResp.json();
-            if (setJson.status === 'success') {
-                showToast(`Carpeta destino del proyecto: ${setJson.project_name}`, "info");
-            }
-        } catch (setErr) {
-            console.error("Error configurando ruta destino:", setErr);
+    let targetPath = targetPathInput ? targetPathInput.value.trim() : '';
+
+    if (!targetPath) {
+        const slug = name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || 'nuevo-proyecto';
+        targetPath = `./projects/${slug}`;
+    }
+
+    try {
+        const setResp = await fetch('/api/set-project-path', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ project_path: targetPath })
+        });
+        const setJson = await setResp.json();
+        if (setJson.status === 'success') {
+            console.log(`Carpeta del proyecto configurada en: ${setJson.project_path}`);
         }
+    } catch (setErr) {
+        console.error("Error configurando ruta destino:", setErr);
     }
     
     // Inicializar estado del proyecto
@@ -658,6 +697,8 @@ async function startDiscoveryFlow() {
         specModules: {},
         metadata: { domain: 'Descubriendo...', productType: 'Web', actors: [], features: [] }
     };
+    
+    await saveProjectToServer();
     
     showScreen('screen-discovery');
     document.getElementById('discovery-loader').classList.remove('hidden');
