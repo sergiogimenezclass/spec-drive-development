@@ -138,6 +138,9 @@ class AutocompleteFileRequest(BaseModel):
     project_data: Dict[str, Any]
     filename: str
 
+import urllib.request
+import urllib.error
+
 def is_quota_error(err_msg: str) -> bool:
     msg_lower = (err_msg or "").lower()
     quota_indicators = [
@@ -150,6 +153,69 @@ def is_quota_error(err_msg: str) -> bool:
 def _get_fallback_candidates(current_model: str) -> List[str]:
     all_models = ["gemini-flash-latest", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.5-flash-lite", "gemini-3.1-pro-preview"]
     return [m for m in all_models if m != current_model]
+
+def is_deepseek_key_or_model(key: str, model_name: str) -> bool:
+    k = (key or "").strip()
+    m = (model_name or "").strip().lower()
+    return k.startswith("sk-") or "deepseek" in m
+
+class UnifiedResponse:
+    def __init__(self, text: str):
+        self.text = text
+
+def call_openai_compatible_api(api_key: str, model_name: str, messages: list, json_mode: bool = False, base_url: str = "https://api.deepseek.com/chat/completions") -> str:
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {api_key}"
+    }
+    m_name = model_name if model_name in ["deepseek-chat", "deepseek-reasoner"] else "deepseek-chat"
+    payload = {
+        "model": m_name,
+        "messages": messages,
+        "temperature": 0.3
+    }
+    if json_mode:
+        payload["response_format"] = {"type": "json_object"}
+        
+    data = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(base_url, data=data, headers=headers, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=120) as response:
+            res_json = json.loads(response.read().decode("utf-8"))
+            return res_json["choices"][0]["message"]["content"]
+    except urllib.error.HTTPError as e:
+        err_body = e.read().decode("utf-8")
+        logger.error(f"HTTPError desde DeepSeek API ({e.code}): {err_body}")
+        if e.code == 429:
+            raise HTTPException(status_code=429, detail=f"⚠️ DeepSeek Límite de Cuota Alcanzado (429): {err_body}")
+        elif e.code == 401:
+            raise HTTPException(status_code=401, detail=f"⚠️ DeepSeek API Key no válida (401): {err_body}")
+        else:
+            raise HTTPException(status_code=e.code, detail=f"⚠️ Error en servicio DeepSeek ({e.code}): {err_body}")
+    except Exception as e:
+        logger.error(f"Error conectando con DeepSeek API: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error al conectar con servidor DeepSeek: {str(e)}")
+
+class DeepSeekChatSessionWrapper:
+    def __init__(self, key: str, model_name: str, history=None):
+        self.key = key
+        self.model_name = model_name
+        self.history = []
+        if history:
+            for h in history:
+                role = "assistant" if h.get("role") in ["model", "assistant"] else "user"
+                parts = h.get("parts", [])
+                content = parts[0] if isinstance(parts, list) and parts else h.get("content", "")
+                if isinstance(content, dict):
+                    content = content.get("text", str(content))
+                self.history.append({"role": role, "content": str(content)})
+
+    def send_message(self, content, **kwargs):
+        user_content = str(content)
+        self.history.append({"role": "user", "content": user_content})
+        res_text = call_openai_compatible_api(self.key, self.model_name, self.history)
+        self.history.append({"role": "assistant", "content": res_text})
+        return UnifiedResponse(res_text)
 
 class GeminiChatSessionWrapper:
     def __init__(self, generative_model, history=None, model_wrapper=None, key_used=None, **kwargs):
@@ -197,13 +263,6 @@ class GeminiChatSessionWrapper:
                 )
             raise HTTPException(status_code=500, detail=f"Error en Chat Copilot: {err_msg}")
 
-            if "401" in err_msg or "invalid" in err_msg.lower() or "api_key" in err_msg.lower():
-                raise HTTPException(
-                    status_code=401,
-                    detail=f"⚠️ API Key no válida (401): {err_msg}"
-                )
-            raise HTTPException(status_code=500, detail=f"Error en Chat Copilot: {err_msg}")
-
 class GeminiModelWrapper:
     def __init__(self, primary_key: str = "", fallback_key: str = "", model_name: str = "gemini-2.5-flash"):
         self.primary_key = (primary_key or "").strip()
@@ -223,7 +282,7 @@ class GeminiModelWrapper:
         if not keys_to_try:
             raise HTTPException(
                 status_code=401, 
-                detail="Falta la API Key de Gemini. Configúrala en la interfaz web o en las variables de entorno."
+                detail="Falta la API Key. Configúrala en la interfaz web (Gemini o DeepSeek sk-...)."
             )
 
         last_error = None
@@ -231,6 +290,34 @@ class GeminiModelWrapper:
         quota_err_str = ""
 
         for idx, key in enumerate(keys_to_try):
+            if is_deepseek_key_or_model(key, self.model_name):
+                try:
+                    logger.info(f"Usando proveedor DeepSeek para clave/modelo '{self.model_name}'")
+                    messages = []
+                    json_mode = False
+                    if isinstance(contents, str):
+                        messages = [{"role": "user", "content": contents}]
+                    elif isinstance(contents, list):
+                        messages = [{"role": "user", "content": str(item)} for item in contents]
+                    else:
+                        messages = [{"role": "user", "content": str(contents)}]
+
+                    if kwargs.get("generation_config", {}).get("response_mime_type") == "application/json":
+                        json_mode = True
+
+                    res_text = call_openai_compatible_api(key, self.model_name, messages, json_mode=json_mode)
+                    return UnifiedResponse(res_text)
+                except HTTPException as http_e:
+                    raise http_e
+                except Exception as ds_err:
+                    last_error = ds_err
+                    err_str = str(ds_err)
+                    logger.error(f"Error con proveedor DeepSeek: {err_str}")
+                    if is_quota_error(err_str):
+                        has_any_quota_err = True
+                        quota_err_str = err_str
+                    continue
+
             try:
                 genai.configure(api_key=key)
                 m = genai.GenerativeModel(self.model_name)
@@ -297,7 +384,7 @@ class GeminiModelWrapper:
         if not keys_to_try:
             raise HTTPException(
                 status_code=401, 
-                detail="Falta la API Key de Gemini. Configúrala en la interfaz web o en las variables de entorno."
+                detail="Falta la API Key. Configúrala en la interfaz web."
             )
 
         last_error = None
@@ -305,6 +392,21 @@ class GeminiModelWrapper:
         quota_err_str = ""
 
         for idx, key in enumerate(keys_to_try):
+            if is_deepseek_key_or_model(key, self.model_name):
+                try:
+                    logger.info(f"Iniciando chat con proveedor DeepSeek ({self.model_name})")
+                    return DeepSeekChatSessionWrapper(key, self.model_name, history=history)
+                except HTTPException as http_e:
+                    raise http_e
+                except Exception as ds_err:
+                    last_error = ds_err
+                    err_str = str(ds_err)
+                    logger.error(f"Error iniciando chat con DeepSeek: {err_str}")
+                    if is_quota_error(err_str):
+                        has_any_quota_err = True
+                        quota_err_str = err_str
+                    continue
+
             try:
                 genai.configure(api_key=key)
                 m = genai.GenerativeModel(self.model_name)
@@ -407,7 +509,9 @@ async def get_config():
             {"id": "gemini-3.1-pro-preview", "name": "🧠 Gemini 3.1 Pro (Máxima Potencia)", "badge": "Pro"},
             {"id": "gemini-2.5-flash", "name": "⚡ Gemini 2.5 Flash (Ultra Rápido - Recomendado)", "badge": "Flash"},
             {"id": "gemini-2.0-flash", "name": "⚡ Gemini 2.0 Flash (Alta Disponibilidad)", "badge": "Flash"},
-            {"id": "gemini-flash-latest", "name": "⚡ Gemini Flash (Última Versión)", "badge": "Flash"}
+            {"id": "gemini-flash-latest", "name": "⚡ Gemini Flash (Última Versión)", "badge": "Flash"},
+            {"id": "deepseek-chat", "name": "🐳 DeepSeek V3 (deepseek-chat)", "badge": "DeepSeek"},
+            {"id": "deepseek-reasoner", "name": "🐳 DeepSeek R1 (deepseek-reasoner)", "badge": "DeepSeek"}
         ]
     }
 
