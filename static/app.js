@@ -10,6 +10,7 @@ const state = {
     fallbackApiKey: localStorage.getItem('gemini_fallback_key') || '',
     selectedModel: localStorage.getItem('gemini_model') || 'gemini-2.5-flash',
     lastFailedAction: null,
+    isRetryingFromModal: false,
     currentProject: {
         id: '',
         name: 'Sin título',
@@ -66,7 +67,13 @@ async function checkResponseForQuotaError(response, retryCallback = null) {
         let errData = {};
         try { errData = await response.json(); } catch(e) {}
         const errMsg = errData.detail || errData.message || `Error ${response.status}: Límite de Cuota o Rate Limit Excedido.`;
-        openQuotaModal(errMsg, retryCallback);
+        
+        if (state.isRetryingFromModal) {
+            showToast(`⚠️ ${errMsg}`, "warning");
+            state.isRetryingFromModal = false;
+        } else {
+            openQuotaModal(errMsg, retryCallback);
+        }
         return true;
     }
     return false;
@@ -653,9 +660,9 @@ function setupEventListeners() {
             localStorage.setItem('gemini_fallback_key', fallbackKey);
             localStorage.setItem('gemini_model', modelVal);
 
-            const geminiInput = document.getElementById('gemini-api-key');
-            if (geminiInput) geminiInput.value = primaryKey;
+            updateKeyStatusUI();
 
+            const headerModelSelect = document.getElementById('header-model-select');
             if (headerModelSelect) headerModelSelect.value = modelVal;
 
             if (quotaModal) quotaModal.classList.add('hidden');
@@ -664,8 +671,15 @@ function setupEventListeners() {
             if (typeof state.lastFailedAction === 'function') {
                 const retryFn = state.lastFailedAction;
                 state.lastFailedAction = null;
-                showToast("Reintentando acción previa...", "info");
-                await retryFn();
+                state.isRetryingFromModal = true;
+                showToast("Reintentando consulta...", "info");
+                try {
+                    await retryFn();
+                } catch(err) {
+                    console.error("Error al reintentar la consulta:", err);
+                } finally {
+                    state.isRetryingFromModal = false;
+                }
             }
         });
     }
