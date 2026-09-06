@@ -275,7 +275,9 @@ async function initApp() {
 function loadSettings() {
     state.apiKey = localStorage.getItem('gemini_api_key') || '';
     state.fallbackApiKey = localStorage.getItem('gemini_fallback_key') || '';
-    state.selectedModel = localStorage.getItem('gemini_model') || 'gemini-2.5-flash';
+    let savedModel = localStorage.getItem('gemini_model') || 'gemini-2.5-flash';
+    if (savedModel === 'gemini-2.5-pro') savedModel = 'gemini-1.5-pro';
+    state.selectedModel = savedModel;
     
     const keyInput = document.getElementById('gemini-api-key');
     if (keyInput) keyInput.value = state.apiKey;
