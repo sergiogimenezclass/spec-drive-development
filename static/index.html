@@ -62,6 +62,18 @@
                     <span>Guía de Specs</span>
                 </button>
 
+                <!-- Selector de Modelo de IA -->
+                <div class="model-select-wrapper" style="display: flex; align-items: center; gap: 6px; background: var(--bg-surface-hover); padding: 4px 10px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+                    <i class="fa-solid fa-microchip" style="color: var(--primary); font-size: 13px;"></i>
+                    <select id="header-model-select" style="background: transparent; border: none; color: var(--text-primary); font-family: inherit; font-size: 12px; font-weight: 600; outline: none; cursor: pointer;" title="Seleccionar Modelo de IA (Pro vs Flash)">
+                        <option value="gemini-2.5-pro">🧠 2.5 Pro (Máxima Potencia)</option>
+                        <option value="gemini-2.5-flash" selected>⚡ 2.5 Flash (Rápido)</option>
+                        <option value="gemini-2.0-flash">⚡ 2.0 Flash</option>
+                        <option value="gemini-1.5-pro">🧠 1.5 Pro</option>
+                        <option value="gemini-1.5-flash">⚡ 1.5 Flash</option>
+                    </select>
+                </div>
+
                 <!-- Clave API de Gemini -->
                 <div class="api-key-input-wrapper">
                     <i class="fa-solid fa-key key-icon"></i>
@@ -507,9 +519,59 @@
         </div>
     </div>
 
+    <!-- MODAL DE LÍMITE DE CUOTA Y FALLBACK DE IA -->
+    <div id="ai-quota-modal" class="modal-overlay hidden" style="z-index: 2000;">
+        <div class="modal-card glass-card" style="max-width: 580px; width: 92vw; padding: 28px;">
+            <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 16px;">
+                <div style="width: 48px; height: 48px; border-radius: 50%; background: rgba(239, 68, 68, 0.15); display: flex; align-items: center; justify-content: center; border: 1px solid rgba(239, 68, 68, 0.4);">
+                    <i class="fa-solid fa-triangle-exclamation" style="font-size: 22px; color: #ef4444;"></i>
+                </div>
+                <div>
+                    <h3 style="margin: 0; font-size: 18px; font-weight: 700; color: var(--text-primary);">Límite de Cuota o Rate Limit Alcanzado</h3>
+                    <span style="font-size: 12px; color: var(--text-secondary);" id="quota-modal-subtitle">Se alcanzó el límite de solicitudes o créditos de tu API Key actual.</span>
+                </div>
+            </div>
+
+            <div id="quota-error-details-box" style="font-size: 12px; color: #f87171; background: rgba(239, 68, 68, 0.08); padding: 12px; border-radius: 8px; border: 1px solid rgba(239, 68, 68, 0.2); margin-bottom: 20px; line-height: 1.5; max-height: 100px; overflow-y: auto;">
+                ⚠️ Error HTTP 429 / Quota Exceeded
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 16px;">
+                <div class="form-group">
+                    <label for="quota-model-select" style="font-size: 13px; font-weight: 600;">Modelo de IA</label>
+                    <select id="quota-model-select" style="width: 100%; padding: 10px; border-radius: 8px; background: var(--bg-surface-hover); color: var(--text-primary); border: 1px solid var(--border-color); font-family: inherit;">
+                        <option value="gemini-2.5-pro">🧠 Gemini 2.5 Pro (Máxima Potencia - Recomendado)</option>
+                        <option value="gemini-2.5-flash" selected>⚡ Gemini 2.5 Flash (Ultra Rápido)</option>
+                        <option value="gemini-2.0-flash">⚡ Gemini 2.0 Flash (Alta Disponibilidad)</option>
+                        <option value="gemini-1.5-pro">🧠 Gemini 1.5 Pro (Razonamiento Complejo)</option>
+                        <option value="gemini-1.5-flash">⚡ Gemini 1.5 Flash (Estándar)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="quota-primary-key" style="font-size: 13px; font-weight: 600;">API Key Principal (Google AI Studio)</label>
+                    <input type="password" id="quota-primary-key" placeholder="AIzaSy..." style="width: 100%; padding: 10px; border-radius: 8px; background: var(--bg-surface-hover); color: var(--text-primary); border: 1px solid var(--border-color);">
+                </div>
+
+                <div class="form-group">
+                    <label for="quota-fallback-key" style="font-size: 13px; font-weight: 600;">API Key de Resguardo / Secundaria (Opcional)</label>
+                    <input type="password" id="quota-fallback-key" placeholder="AIzaSy... (Clave alternativa de respaldo)" style="width: 100%; padding: 10px; border-radius: 8px; background: var(--bg-surface-hover); color: var(--text-primary); border: 1px solid var(--border-color);">
+                    <span style="font-size: 11px; color: var(--text-secondary); margin-top: 4px; display: block;">💡 Si la clave principal alcanza el límite de cuota, Spec IDE usará automáticamente la clave de resguardo.</span>
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 24px;">
+                <button id="btn-close-quota-modal" class="btn btn-border btn-sm">Cerrar</button>
+                <button id="btn-save-quota-modal" class="btn btn-primary btn-sm" style="background: linear-gradient(135deg, #10b981, #059669); color: white; border: none; font-weight: 600;">
+                    <i class="fa-solid fa-arrows-rotate"></i> Guardar y Reintentar Petición
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Notificaciones flotantes -->
     <div id="toast-container" class="toast-container"></div>
 
-    <script src="app.js?v=2.3.0"></script>
+    <script src="app.js?v=2.4.0"></script>
 </body>
 </html>

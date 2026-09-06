@@ -138,24 +138,82 @@ class AutocompleteFileRequest(BaseModel):
     project_data: Dict[str, Any]
     filename: str
 
-# Helper para configurar Gemini y obtener el modelo
-def get_gemini_model(api_key: str):
-    key_to_use = api_key.strip() if api_key else ""
-    if not key_to_use:
-        key_to_use = os.environ.get("GEMINI_API_KEY", "").strip()
+def is_quota_error(err_msg: str) -> bool:
+    msg_lower = (err_msg or "").lower()
+    quota_indicators = [
+        "429", "quota", "resourceexhausted", "rate_limit", "rate limit",
+        "exceeded your current quota", "too many requests", "limit: 20", "out of credits",
+        "over_query_limit", "resource_exhausted"
+    ]
+    return any(ind in msg_lower for ind in quota_indicators)
+
+class GeminiModelWrapper:
+    def __init__(self, primary_key: str = "", fallback_key: str = "", model_name: str = "gemini-2.5-flash"):
+        self.primary_key = (primary_key or "").strip()
+        self.fallback_key = (fallback_key or "").strip()
+        self.model_name = (model_name or "gemini-2.5-flash").strip()
+
+    def generate_content(self, contents, **kwargs):
+        keys_to_try = [k for k in [self.primary_key, self.fallback_key] if k]
+        if not keys_to_try:
+            keys_to_try = [k for k in [os.environ.get("GEMINI_API_KEY", "").strip(), os.environ.get("GEMINI_FALLBACK_API_KEY", "").strip()] if k]
+
+        if not keys_to_try:
+            raise HTTPException(
+                status_code=401, 
+                detail="Falta la API Key de Gemini. Configúrala en la interfaz web o en las variables de entorno."
+            )
+
+        last_error = None
+        for idx, key in enumerate(keys_to_try):
+            try:
+                genai.configure(api_key=key)
+                m = genai.GenerativeModel(self.model_name)
+                return m.generate_content(contents, **kwargs)
+            except Exception as e:
+                last_error = e
+                err_str = str(e).lower()
+                logger.warning(f"Intento {idx + 1} con modelo '{self.model_name}' falló: {e}")
+
+                # Si es error de modelo no encontrado/no soportado y era un modelo 'pro', fallback a 'gemini-2.5-flash'
+                if ("not found" in err_str or "404" in err_str or "unsupported" in err_str) and "pro" in self.model_name:
+                    try:
+                        logger.info("Modelo 'pro' no soportado en la clave, intentando con 'gemini-2.5-flash'")
+                        m_fallback = genai.GenerativeModel("gemini-2.5-flash")
+                        return m_fallback.generate_content(contents, **kwargs)
+                    except Exception as sub_e:
+                        last_error = sub_e
+
+        # Detectar error universal de cuota / rate limit / 429
+        err_msg = str(last_error)
+        if is_quota_error(err_msg):
+            raise HTTPException(
+                status_code=429,
+                detail=f"⚠️ Límite de Cuota Alcanzado (429/Quota Exceeded): {err_msg}. Ingresa una clave de resguardo o cambia el modelo en la interfaz."
+            )
         
-    if not key_to_use:
+        if "401" in err_msg or "invalid" in err_msg.lower() or "api_key" in err_msg.lower():
+            raise HTTPException(
+                status_code=401,
+                detail=f"⚠️ API Key no válida (401): {err_msg}"
+            )
+
         raise HTTPException(
-            status_code=401, 
-            detail="Falta la API Key de Gemini. Configúrala en la interfaz web o mediante la variable de entorno GEMINI_API_KEY."
+            status_code=500,
+            detail=f"Error en el servicio de IA: {err_msg}"
         )
-    try:
-        genai.configure(api_key=key_to_use)
-        # Usamos gemini-2.5-flash para velocidad y consistencia en el año 2026
-        return genai.GenerativeModel("gemini-2.5-flash")
-    except Exception as e:
-        logger.error(f"Error al configurar la API de Gemini: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error de configuración de IA: {str(e)}")
+
+# Helper para obtener el modelo Gemini wrapper
+def get_gemini_model(
+    api_key: Optional[str] = None,
+    fallback_key: Optional[str] = None,
+    model_name: Optional[str] = None
+) -> GeminiModelWrapper:
+    primary = (api_key or "").strip() or os.environ.get("GEMINI_API_KEY", "").strip()
+    sec = (fallback_key or "").strip() or os.environ.get("GEMINI_FALLBACK_API_KEY", "").strip()
+    m_name = (model_name or "").strip() or os.environ.get("GEMINI_MODEL", "gemini-2.5-flash").strip()
+
+    return GeminiModelWrapper(primary_key=primary, fallback_key=sec, model_name=m_name)
 
 # Servir archivos estáticos del frontend
 static_dir = os.path.join(os.path.dirname(__file__), "static")
@@ -177,7 +235,20 @@ GENERATION_STATUS: Dict[str, Any] = {
 @app.get("/api/config")
 async def get_config():
     has_key = bool(os.environ.get("GEMINI_API_KEY"))
-    return {"hasApiKey": has_key}
+    has_fallback = bool(os.environ.get("GEMINI_FALLBACK_API_KEY"))
+    current_model = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
+    return {
+        "hasApiKey": has_key,
+        "hasFallbackKey": has_fallback,
+        "currentModel": current_model,
+        "availableModels": [
+            {"id": "gemini-2.5-pro", "name": "🧠 Gemini 2.5 Pro (Máxima Potencia - Recomendado)", "badge": "Pro"},
+            {"id": "gemini-2.5-flash", "name": "⚡ Gemini 2.5 Flash (Ultra Rápido)", "badge": "Flash"},
+            {"id": "gemini-2.0-flash", "name": "⚡ Gemini 2.0 Flash (Alta Disponibilidad)", "badge": "Flash"},
+            {"id": "gemini-1.5-pro", "name": "🧠 Gemini 1.5 Pro (Razonamiento Complejo)", "badge": "Pro"},
+            {"id": "gemini-1.5-flash", "name": "⚡ Gemini 1.5 Flash (Estándar)", "badge": "Flash"}
+        ]
+    }
 
 @app.get("/api/generation-status")
 async def get_generation_status():
@@ -307,8 +378,8 @@ async def select_folder_dialog():
     return res
 
 @app.post("/api/analyze-idea")
-async def analyze_idea(req: IdeaAnalysisRequest, x_gemini_key: str = Header(None)):
-    model = get_gemini_model(x_gemini_key)
+async def analyze_idea(req: IdeaAnalysisRequest, x_gemini_key: Optional[str] = Header(None), x_gemini_fallback_key: Optional[str] = Header(None), x_gemini_model: Optional[str] = Header(None)):
+    model = get_gemini_model(x_gemini_key, x_gemini_fallback_key, x_gemini_model)
     
     prompt = f"""
     Eres un Staff Software Architect y Product Designer.
@@ -377,8 +448,8 @@ async def analyze_idea(req: IdeaAnalysisRequest, x_gemini_key: str = Header(None
         }
 
 @app.post("/api/next-questions")
-async def next_questions(req: NextQuestionsRequest, x_gemini_key: str = Header(None)):
-    model = get_gemini_model(x_gemini_key)
+async def next_questions(req: NextQuestionsRequest, x_gemini_key: Optional[str] = Header(None), x_gemini_fallback_key: Optional[str] = Header(None), x_gemini_model: Optional[str] = Header(None)):
+    model = get_gemini_model(x_gemini_key, x_gemini_fallback_key, x_gemini_model)
     
     prompt = f"""
     Eres un Tech Lead e Ingeniero de Requisitos.
@@ -414,8 +485,8 @@ async def next_questions(req: NextQuestionsRequest, x_gemini_key: str = Header(N
         return {"questions": []}
 
 @app.post("/api/generate-diagram")
-async def generate_diagram(req: DiagramRequest, x_gemini_key: str = Header(None)):
-    model = get_gemini_model(x_gemini_key)
+async def generate_diagram(req: DiagramRequest, x_gemini_key: Optional[str] = Header(None), x_gemini_fallback_key: Optional[str] = Header(None), x_gemini_model: Optional[str] = Header(None)):
+    model = get_gemini_model(x_gemini_key, x_gemini_fallback_key, x_gemini_model)
     
     prompt = f"""
     Eres un Arquitecto de Software experto.
@@ -451,8 +522,8 @@ async def generate_diagram(req: DiagramRequest, x_gemini_key: str = Header(None)
         return {"code": "graph TD\n  A[Error al generar el diagrama] --> B[Verifica tu API Key]"}
 
 @app.post("/api/check-consistency")
-async def check_consistency(req: SaveProjectRequest, x_gemini_key: str = Header(None)):
-    model = get_gemini_model(x_gemini_key)
+async def check_consistency(req: SaveProjectRequest, x_gemini_key: Optional[str] = Header(None), x_gemini_fallback_key: Optional[str] = Header(None), x_gemini_model: Optional[str] = Header(None)):
+    model = get_gemini_model(x_gemini_key, x_gemini_fallback_key, x_gemini_model)
     
     prompt = f"""
     Eres un QA Lead y Arquitecto de Software.
@@ -640,9 +711,8 @@ def clean_markdown(text: str) -> str:
     return text
 
 @app.post("/api/export-specs")
-async def export_specs(req: SaveProjectRequest, x_gemini_key: str = Header(None)):
-    global GENERATION_STATUS
-    model = get_gemini_model(x_gemini_key)
+async def export_specs(req: SaveProjectRequest, x_gemini_key: Optional[str] = Header(None), x_gemini_fallback_key: Optional[str] = Header(None), x_gemini_model: Optional[str] = Header(None)):
+    model = get_gemini_model(x_gemini_key, x_gemini_fallback_key, x_gemini_model)
     specs_dir = get_specs_dir()
     project_file = get_project_file()
     
@@ -1041,8 +1111,8 @@ async def export_specs(req: SaveProjectRequest, x_gemini_key: str = Header(None)
     }
 
 @app.post("/api/plan-features")
-async def plan_features(req: PlanFeaturesRequest, x_gemini_key: str = Header(None)):
-    model = get_gemini_model(x_gemini_key)
+async def plan_features(req: PlanFeaturesRequest, x_gemini_key: Optional[str] = Header(None), x_gemini_fallback_key: Optional[str] = Header(None), x_gemini_model: Optional[str] = Header(None)):
+    model = get_gemini_model(x_gemini_key, x_gemini_fallback_key, x_gemini_model)
     project = req.project_data
     answers = project.get("answers", {})
     idea = project.get("seedIdea", "")
@@ -1140,8 +1210,8 @@ class GenerateFeatureRequest(BaseModel):
     feature: dict
 
 @app.post("/api/generate-feature")
-async def generate_feature(req: GenerateFeatureRequest, x_gemini_key: str = Header(None)):
-    model = get_gemini_model(x_gemini_key)
+async def generate_feature(req: GenerateFeatureRequest, x_gemini_key: Optional[str] = Header(None), x_gemini_fallback_key: Optional[str] = Header(None), x_gemini_model: Optional[str] = Header(None)):
+    model = get_gemini_model(x_gemini_key, x_gemini_fallback_key, x_gemini_model)
     project = req.project_data
     feature = req.feature
     
@@ -1350,9 +1420,9 @@ async def autocomplete_file(req: AutocompleteFileRequest, x_gemini_key: str = He
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/copilot-chat")
-async def copilot_chat(req: CopilotChatRequest, x_gemini_key: str = Header(None)):
+async def copilot_chat(req: CopilotChatRequest, x_gemini_key: Optional[str] = Header(None), x_gemini_fallback_key: Optional[str] = Header(None), x_gemini_model: Optional[str] = Header(None)):
     try:
-        model = get_gemini_model(x_gemini_key)
+        model = get_gemini_model(x_gemini_key, x_gemini_fallback_key, x_gemini_model)
         pdata = req.project_data or {}
         proj_name = pdata.get("name", "Proyecto Activo")
         seed_idea = pdata.get("seedIdea", "")
@@ -1444,9 +1514,9 @@ async def clear_copilot_history_endpoint():
     return {"status": "success", "message": "Historial de chat borrado"}
 
 @app.post("/api/explore-extract-answers")
-async def explore_extract_answers(req: ExploreExtractRequest, x_gemini_key: str = Header(None)):
+async def explore_extract_answers(req: ExploreExtractRequest, x_gemini_key: Optional[str] = Header(None), x_gemini_fallback_key: Optional[str] = Header(None), x_gemini_model: Optional[str] = Header(None)):
     try:
-        model = get_gemini_model(x_gemini_key)
+        model = get_gemini_model(x_gemini_key, x_gemini_fallback_key, x_gemini_model)
         
         chat_text_list = []
         for msg in req.history:

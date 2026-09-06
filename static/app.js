@@ -6,7 +6,10 @@
 
 // Estado Global de la Aplicación
 const state = {
-    apiKey: '',
+    apiKey: localStorage.getItem('gemini_api_key') || '',
+    fallbackApiKey: localStorage.getItem('gemini_fallback_key') || '',
+    selectedModel: localStorage.getItem('gemini_model') || 'gemini-2.5-flash',
+    lastFailedAction: null,
     currentProject: {
         id: '',
         name: 'Sin título',
@@ -28,6 +31,46 @@ const state = {
     dynamicRounds: 0,
     copilotHistory: []
 };
+
+// Helper para obtener headers centralizados de IA
+function getAiHeaders(customHeaders = {}) {
+    return {
+        'Content-Type': 'application/json',
+        'X-Gemini-Key': state.apiKey || '',
+        'X-Gemini-Fallback-Key': state.fallbackApiKey || '',
+        'X-Gemini-Model': state.selectedModel || 'gemini-2.5-flash',
+        ...customHeaders
+    };
+}
+
+// Abrir Modal de Cuota Excedida y Fallback de IA
+function openQuotaModal(errorDetails = '', retryCallback = null) {
+    if (retryCallback) state.lastFailedAction = retryCallback;
+    const modal = document.getElementById('ai-quota-modal');
+    const detailsBox = document.getElementById('quota-error-details-box');
+    const primaryInput = document.getElementById('quota-primary-key');
+    const fallbackInput = document.getElementById('quota-fallback-key');
+    const modelSelect = document.getElementById('quota-model-select');
+
+    if (detailsBox) detailsBox.innerText = errorDetails || "⚠️ Límite de cuota o Rate Limit (429) alcanzado.";
+    if (primaryInput) primaryInput.value = state.apiKey || '';
+    if (fallbackInput) fallbackInput.value = state.fallbackApiKey || '';
+    if (modelSelect) modelSelect.value = state.selectedModel || 'gemini-2.5-flash';
+
+    if (modal) modal.classList.remove('hidden');
+}
+
+// Verificar si la respuesta fue un error de cuota (429/403)
+async function checkResponseForQuotaError(response, retryCallback = null) {
+    if (response.status === 429 || response.status === 403) {
+        let errData = {};
+        try { errData = await response.json(); } catch(e) {}
+        const errMsg = errData.detail || errData.message || `Error ${response.status}: Límite de Cuota o Rate Limit Excedido.`;
+        openQuotaModal(errMsg, retryCallback);
+        return true;
+    }
+    return false;
+}
 
 // Estructura fija de los 16 archivos de la spec
 const SPEC_FILES = [
@@ -231,7 +274,14 @@ async function initApp() {
 // Cargar configuraciones del almacenamiento local
 function loadSettings() {
     state.apiKey = localStorage.getItem('gemini_api_key') || '';
-    document.getElementById('gemini-api-key').value = state.apiKey;
+    state.fallbackApiKey = localStorage.getItem('gemini_fallback_key') || '';
+    state.selectedModel = localStorage.getItem('gemini_model') || 'gemini-2.5-flash';
+    
+    const keyInput = document.getElementById('gemini-api-key');
+    if (keyInput) keyInput.value = state.apiKey;
+
+    const headerModelSelect = document.getElementById('header-model-select');
+    if (headerModelSelect) headerModelSelect.value = state.selectedModel;
     
     const theme = localStorage.getItem('theme');
     if (theme === 'dark') {
@@ -263,6 +313,9 @@ async function checkBackendConfig() {
         const response = await fetch('/api/config');
         const data = await response.json();
         state.hasBackendApiKey = data.hasApiKey;
+        if (data.hasFallbackKey) {
+            state.hasBackendFallbackKey = true;
+        }
         
         const keyInput = document.getElementById('gemini-api-key');
         if (state.hasBackendApiKey) {
@@ -514,6 +567,67 @@ function setupEventListeners() {
     if (clearCopilotBtn) clearCopilotBtn.addEventListener('click', clearCopilotChat);
     if (sendCopilotBtn) sendCopilotBtn.addEventListener('click', () => sendCopilotMessage());
     if (exploreFinishWizardBtn) exploreFinishWizardBtn.addEventListener('click', extractAnswersAndLaunchWizard);
+
+    // Event Listeners del Selector de Modelo de IA y Modal de Cuota
+    const headerModelSelect = document.getElementById('header-model-select');
+    if (headerModelSelect) {
+        headerModelSelect.value = state.selectedModel || 'gemini-2.5-flash';
+        headerModelSelect.addEventListener('change', (e) => {
+            state.selectedModel = e.target.value;
+            localStorage.setItem('gemini_model', state.selectedModel);
+            const quotaSelect = document.getElementById('quota-model-select');
+            if (quotaSelect) quotaSelect.value = state.selectedModel;
+            const modelLabel = e.target.options[e.target.selectedIndex].text;
+            showToast(`Modelo de IA cambiado a: ${modelLabel}`, "info");
+        });
+    }
+
+    const saveQuotaBtn = document.getElementById('btn-save-quota-modal');
+    const closeQuotaBtn = document.getElementById('btn-close-quota-modal');
+    const quotaModal = document.getElementById('ai-quota-modal');
+
+    if (closeQuotaBtn) {
+        closeQuotaBtn.addEventListener('click', () => {
+            if (quotaModal) quotaModal.classList.add('hidden');
+        });
+    }
+
+    if (quotaModal) {
+        quotaModal.addEventListener('click', (e) => {
+            if (e.target === quotaModal) quotaModal.classList.add('hidden');
+        });
+    }
+
+    if (saveQuotaBtn) {
+        saveQuotaBtn.addEventListener('click', async () => {
+            const primaryKey = document.getElementById('quota-primary-key').value.trim();
+            const fallbackKey = document.getElementById('quota-fallback-key').value.trim();
+            const modelVal = document.getElementById('quota-model-select').value;
+
+            state.apiKey = primaryKey;
+            state.fallbackApiKey = fallbackKey;
+            state.selectedModel = modelVal;
+
+            localStorage.setItem('gemini_api_key', primaryKey);
+            localStorage.setItem('gemini_fallback_key', fallbackKey);
+            localStorage.setItem('gemini_model', modelVal);
+
+            const geminiInput = document.getElementById('gemini-api-key');
+            if (geminiInput) geminiInput.value = primaryKey;
+
+            if (headerModelSelect) headerModelSelect.value = modelVal;
+
+            if (quotaModal) quotaModal.classList.add('hidden');
+            showToast("Configuración de IA guardada exitosamente", "success");
+
+            if (typeof state.lastFailedAction === 'function') {
+                const retryFn = state.lastFailedAction;
+                state.lastFailedAction = null;
+                showToast("Reintentando acción previa...", "info");
+                await retryFn();
+            }
+        });
+    }
 
     if (expandCopilotBtn) {
         expandCopilotBtn.addEventListener('click', () => {
@@ -839,16 +953,16 @@ async function extractAnswersAndLaunchWizard() {
     try {
         const extractResp = await fetch('/api/explore-extract-answers', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Gemini-Key': state.apiKey || ''
-            },
+            headers: getAiHeaders(),
             body: JSON.stringify({
                 history: state.copilotHistory || []
             })
         });
-        const extractData = await extractResp.json();
 
+        const isQuota = await checkResponseForQuotaError(extractResp, extractAnswersAndLaunchWizard);
+        if (isQuota) return;
+
+        const extractData = await extractResp.json();
         let extractedAnswers = extractData.answers || extractData.extracted_answers || {};
 
         // Obtener questionTree si no existe
@@ -856,14 +970,14 @@ async function extractAnswersAndLaunchWizard() {
             try {
                 const analyzeResp = await fetch('/api/analyze-idea', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Gemini-Key': state.apiKey || ''
-                    },
+                    headers: getAiHeaders(),
                     body: JSON.stringify({ idea: (state.currentProject && state.currentProject.seedIdea) || '' })
                 });
-                const analyzeData = await analyzeResp.json();
-                state.questionTree = analyzeData.questions || [];
+                const isAnalyzeQuota = await checkResponseForQuotaError(analyzeResp, extractAnswersAndLaunchWizard);
+                if (!isAnalyzeQuota) {
+                    const analyzeData = await analyzeResp.json();
+                    state.questionTree = analyzeData.questions || [];
+                }
             } catch (aErr) {
                 console.error("Error al obtener árbol de preguntas:", aErr);
             }
@@ -1872,16 +1986,20 @@ async function sendCopilotMessage(queryText) {
     try {
         const resp = await fetch('/api/copilot-chat', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Gemini-Key': state.apiKey || ''
-            },
+            headers: getAiHeaders(),
             body: JSON.stringify({
                 message: text,
                 history: state.copilotHistory || [],
                 project_data: state.currentProject
             })
         });
+
+        const isQuota = await checkResponseForQuotaError(resp, () => sendCopilotMessage(text));
+        if (isQuota) {
+            removeCopilotTyping(typingId);
+            appendCopilotMsg('ai', `⚠️ Límite de cuota (429/Rate Limit) alcanzado. Puedes ingresar una clave de resguardo o cambiar de modelo en el pop-up.`);
+            return;
+        }
 
         const data = await resp.json();
         removeCopilotTyping(typingId);
