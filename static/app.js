@@ -577,12 +577,45 @@ function renderWizardQuestion() {
         const grid = document.createElement('div');
         grid.className = 'select-options-grid';
         
-        q.options.forEach(opt => {
+        const optionsList = [...(q.options || [])];
+        
+        // Incluir opción "Ninguna / Sin autenticación" si es una pregunta sobre seguridad/auth
+        const isAuthQuestion = q.id === 'q_auth' || (q.section && q.section.toLowerCase().includes('segurid')) || (q.label && q.label.toLowerCase().includes('autentic'));
+        if (isAuthQuestion && !optionsList.some(o => o.toLowerCase().includes('ningun') || o.toLowerCase().includes('sin aut'))) {
+            optionsList.unshift("Ninguna / Sin autenticación (API instalada, CLI, herramienta local)");
+        }
+        
+        // Incluir siempre opción personalizada "Otra..."
+        const customOptLabel = "Otra (Escribir respuesta personalizada...)";
+        if (!optionsList.includes(customOptLabel)) {
+            optionsList.push(customOptLabel);
+        }
+
+        const customContainer = document.createElement('div');
+        customContainer.style.marginTop = '12px';
+        customContainer.className = 'hidden';
+        
+        const customTextarea = document.createElement('textarea');
+        customTextarea.placeholder = "Escribe tu respuesta personalizada aquí...";
+        customTextarea.value = prevAnswer.startsWith("Otra:") ? prevAnswer.replace("Otra:", "").trim() : "";
+        customTextarea.addEventListener('input', (e) => {
+            state.currentProject.answers[q.id] = `Otra: ${e.target.value.trim()}`;
+        });
+        customContainer.appendChild(customTextarea);
+
+        optionsList.forEach(opt => {
+            const isCustom = opt === customOptLabel;
+            const isSelected = isCustom ? prevAnswer.startsWith("Otra:") : prevAnswer === opt;
+
             const item = document.createElement('div');
-            item.className = `select-option-item ${prevAnswer === opt ? 'selected' : ''}`;
-            item.innerHTML = `<i class="fa-regular ${prevAnswer === opt ? 'fa-circle-dot' : 'fa-circle'}"></i> <span>${opt}</span>`;
+            item.className = `select-option-item ${isSelected ? 'selected' : ''}`;
+            item.innerHTML = `<i class="fa-regular ${isSelected ? 'fa-circle-dot' : 'fa-circle'}"></i> <span>${opt}</span>`;
+            
+            if (isSelected && isCustom) {
+                customContainer.classList.remove('hidden');
+            }
+
             item.addEventListener('click', () => {
-                // Deseleccionar hermanos
                 grid.querySelectorAll('.select-option-item').forEach(el => el.classList.remove('selected'));
                 grid.querySelectorAll('i').forEach(i => {
                     i.className = 'fa-regular fa-circle';
@@ -590,11 +623,21 @@ function renderWizardQuestion() {
                 
                 item.classList.add('selected');
                 item.querySelector('i').className = 'fa-solid fa-circle-dot';
-                state.currentProject.answers[q.id] = opt;
+                
+                if (isCustom) {
+                    customContainer.classList.remove('hidden');
+                    customTextarea.focus();
+                    state.currentProject.answers[q.id] = customTextarea.value ? `Otra: ${customTextarea.value.trim()}` : "Otra";
+                } else {
+                    customContainer.classList.add('hidden');
+                    state.currentProject.answers[q.id] = opt;
+                }
             });
             grid.appendChild(item);
         });
+        
         inputContainer.appendChild(grid);
+        inputContainer.appendChild(customContainer);
     } else {
         const textarea = document.createElement('textarea');
         textarea.placeholder = "Escribe tu respuesta aquí de forma clara...";

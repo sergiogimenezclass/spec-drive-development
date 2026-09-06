@@ -207,7 +207,7 @@ async def analyze_idea(req: IdeaAnalysisRequest, x_gemini_key: str = Header(None
                 "section": "Seguridad",
                 "label": "¿Qué tipo de autenticación y roles de usuario necesitas para los actores definidos?",
                 "type": "select",
-                "options": ["Email y Contraseña tradicional", "OAuth (Google, Github)", "Autenticación sin contraseña (Magic Links)", "Múltiples Roles complejos"]
+                "options": ["Ninguna / Sin autenticación (API instalada, CLI, herramienta local)", "Email y Contraseña tradicional", "OAuth (Google, Github)", "Autenticación sin contraseña (Magic Links)", "Múltiples Roles complejos"]
             }},
             {{
                 "id": "q_database",
