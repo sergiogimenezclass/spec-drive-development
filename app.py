@@ -147,6 +147,27 @@ def is_quota_error(err_msg: str) -> bool:
     ]
     return any(ind in msg_lower for ind in quota_indicators)
 
+class GeminiChatSessionWrapper:
+    def __init__(self, generative_model, history=None, **kwargs):
+        self.chat_session = generative_model.start_chat(history=history or [], **kwargs)
+
+    def send_message(self, content, **kwargs):
+        try:
+            return self.chat_session.send_message(content, **kwargs)
+        except Exception as e:
+            err_msg = str(e)
+            if is_quota_error(err_msg):
+                raise HTTPException(
+                    status_code=429,
+                    detail=f"⚠️ Límite de Cuota Alcanzado (429/Quota Exceeded): {err_msg}. Ingresa una clave de resguardo o cambia el modelo en la interfaz."
+                )
+            if "401" in err_msg or "invalid" in err_msg.lower() or "api_key" in err_msg.lower():
+                raise HTTPException(
+                    status_code=401,
+                    detail=f"⚠️ API Key no válida (401): {err_msg}"
+                )
+            raise HTTPException(status_code=500, detail=f"Error en Chat Copilot: {err_msg}")
+
 class GeminiModelWrapper:
     def __init__(self, primary_key: str = "", fallback_key: str = "", model_name: str = "gemini-2.5-flash"):
         self.primary_key = (primary_key or "").strip()
@@ -192,6 +213,54 @@ class GeminiModelWrapper:
                 detail=f"⚠️ Límite de Cuota Alcanzado (429/Quota Exceeded): {err_msg}. Ingresa una clave de resguardo o cambia el modelo en la interfaz."
             )
         
+        if "401" in err_msg or "invalid" in err_msg.lower() or "api_key" in err_msg.lower():
+            raise HTTPException(
+                status_code=401,
+                detail=f"⚠️ API Key no válida (401): {err_msg}"
+            )
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error en el servicio de IA: {err_msg}"
+        )
+
+    def start_chat(self, history=None, **kwargs):
+        keys_to_try = [k for k in [self.primary_key, self.fallback_key] if k]
+        if not keys_to_try:
+            keys_to_try = [k for k in [os.environ.get("GEMINI_API_KEY", "").strip(), os.environ.get("GEMINI_FALLBACK_API_KEY", "").strip()] if k]
+
+        if not keys_to_try:
+            raise HTTPException(
+                status_code=401, 
+                detail="Falta la API Key de Gemini. Configúrala en la interfaz web o en las variables de entorno."
+            )
+
+        last_error = None
+        for idx, key in enumerate(keys_to_try):
+            try:
+                genai.configure(api_key=key)
+                m = genai.GenerativeModel(self.model_name)
+                return GeminiChatSessionWrapper(m, history=history, **kwargs)
+            except Exception as e:
+                last_error = e
+                err_str = str(e).lower()
+                logger.warning(f"start_chat intento {idx + 1} con modelo '{self.model_name}' falló: {e}")
+
+                if ("not found" in err_str or "404" in err_str or "unsupported" in err_str) and "pro" in self.model_name:
+                    try:
+                        logger.info("Modelo 'pro' no soportado en la clave, intentando start_chat con 'gemini-2.5-flash'")
+                        m_fallback = genai.GenerativeModel("gemini-2.5-flash")
+                        return GeminiChatSessionWrapper(m_fallback, history=history, **kwargs)
+                    except Exception as sub_e:
+                        last_error = sub_e
+
+        err_msg = str(last_error)
+        if is_quota_error(err_msg):
+            raise HTTPException(
+                status_code=429,
+                detail=f"⚠️ Límite de Cuota Alcanzado (429/Quota Exceeded): {err_msg}. Ingresa una clave de resguardo o cambia el modelo en la interfaz."
+            )
+
         if "401" in err_msg or "invalid" in err_msg.lower() or "api_key" in err_msg.lower():
             raise HTTPException(
                 status_code=401,
