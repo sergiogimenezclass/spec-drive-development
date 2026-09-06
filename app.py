@@ -1400,10 +1400,44 @@ REGLAS DE RESPUESTA:
         response = chat.send_message(full_prompt)
         reply_text = clean_markdown(response.text)
 
-        return {"status": "success", "reply": reply_text}
+        # Guardar historial actualizado en el disco del proyecto
+        history_file = os.path.join(get_target_project_path(), "chat_history.json")
+        updated_history = (req.history or []) + [
+            {"role": "user", "content": req.message},
+            {"role": "model", "content": reply_text}
+        ]
+        try:
+            with open(history_file, "w", encoding="utf-8") as f:
+                json.dump(updated_history, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            logger.error(f"Error guardando chat_history.json: {str(e)}")
+
+        return {"status": "success", "reply": reply_text, "history": updated_history}
     except Exception as e:
         logger.error(f"Error en copilot-chat: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/copilot-history")
+async def get_copilot_history():
+    history_file = os.path.join(get_target_project_path(), "chat_history.json")
+    if os.path.exists(history_file):
+        try:
+            with open(history_file, "r", encoding="utf-8") as f:
+                history = json.load(f)
+                return {"status": "success", "history": history}
+        except Exception as e:
+            logger.error(f"Error leyendo chat_history.json: {str(e)}")
+    return {"status": "success", "history": []}
+
+@app.post("/api/copilot-clear-history")
+async def clear_copilot_history_endpoint():
+    history_file = os.path.join(get_target_project_path(), "chat_history.json")
+    if os.path.exists(history_file):
+        try:
+            os.remove(history_file)
+        except Exception as e:
+            logger.error(f"Error eliminando chat_history.json: {str(e)}")
+    return {"status": "success", "message": "Historial de chat borrado"}
 
 @app.post("/api/open-specs-folder")
 async def open_specs_folder():

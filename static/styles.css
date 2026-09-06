@@ -1706,7 +1706,7 @@ body {
 .copilot-panel {
     width: 550px;
     max-width: 50vw;
-    background: var(--bg-surface);
+    background: var(--bg-surface-solid) !important;
     border-left: 1px solid var(--border-color);
     display: flex;
     flex-direction: column;
@@ -1726,8 +1726,9 @@ body {
     max-width: none !important;
     height: 100% !important;
     z-index: 50;
+    background: var(--bg-surface-solid) !important;
     border-left: 1px solid var(--border-color);
-    box-shadow: -10px 0 30px rgba(0, 0, 0, 0.3);
+    box-shadow: -10px 0 30px rgba(0, 0, 0, 0.5);
 }
 
 .copilot-panel.expanded .copilot-messages {

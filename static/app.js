@@ -1064,6 +1064,7 @@ function loadWorkspace() {
     showScreen('screen-workspace');
     selectSpecFile('product.md');
     saveProjectToServer();
+    loadCopilotHistory();
 }
 
 // Renderizar el árbol lateral de especificaciones
@@ -1716,8 +1717,34 @@ function toggleCopilotPanel() {
     panel.classList.toggle('hidden');
 }
 
-function clearCopilotChat() {
+async function loadCopilotHistory() {
+    try {
+        const resp = await fetch('/api/copilot-history');
+        const data = await resp.json();
+        if (data.status === 'success' && data.history && data.history.length > 0) {
+            state.copilotHistory = data.history;
+            const container = document.getElementById('copilot-messages');
+            if (container) {
+                container.innerHTML = '';
+                data.history.forEach(msg => {
+                    const role = (msg.role === 'user') ? 'user' : 'ai';
+                    appendCopilotMsg(role, msg.content, false);
+                });
+                container.scrollTop = container.scrollHeight;
+            }
+        }
+    } catch (e) {
+        console.error("Error cargando historial de chat:", e);
+    }
+}
+
+async function clearCopilotChat() {
     state.copilotHistory = [];
+    try {
+        await fetch('/api/copilot-clear-history', { method: 'POST' });
+    } catch (e) {
+        console.error("Error al limpiar el historial en servidor:", e);
+    }
     const container = document.getElementById('copilot-messages');
     if (container) {
         container.innerHTML = `
@@ -1765,9 +1792,13 @@ async function sendCopilotMessage(queryText) {
         removeCopilotTyping(typingId);
 
         if (data.status === 'success' && data.reply) {
-            if (!state.copilotHistory) state.copilotHistory = [];
-            state.copilotHistory.push({ role: 'user', content: text });
-            state.copilotHistory.push({ role: 'model', content: data.reply });
+            if (data.history) {
+                state.copilotHistory = data.history;
+            } else {
+                if (!state.copilotHistory) state.copilotHistory = [];
+                state.copilotHistory.push({ role: 'user', content: text });
+                state.copilotHistory.push({ role: 'model', content: data.reply });
+            }
 
             appendCopilotMsg('ai', data.reply);
         } else {
@@ -1781,7 +1812,7 @@ async function sendCopilotMessage(queryText) {
     }
 }
 
-function appendCopilotMsg(role, text) {
+function appendCopilotMsg(role, text, autoScroll = true) {
     const container = document.getElementById('copilot-messages');
     if (!container) return;
 
@@ -1800,7 +1831,9 @@ function appendCopilotMsg(role, text) {
     `;
 
     container.appendChild(msgDiv);
-    container.scrollTop = container.scrollHeight;
+    if (autoScroll) {
+        container.scrollTop = container.scrollHeight;
+    }
 }
 
 function appendCopilotTyping() {
