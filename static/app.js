@@ -309,6 +309,36 @@ async function checkProjectPath() {
     }
 }
 
+// Actualizar indicador visual del estado de la clave API
+function updateKeyStatusUI() {
+    const keyInput = document.getElementById('gemini-api-key');
+    const keyIcon = document.getElementById('key-status-icon');
+    if (!keyInput) return;
+
+    if (state.apiKey) {
+        keyInput.value = state.apiKey;
+        keyInput.placeholder = "Clave personalizada activa";
+        if (keyIcon) {
+            keyIcon.style.color = "var(--success)";
+            keyIcon.title = "Clave API personalizada guardada en el navegador";
+        }
+    } else if (state.hasBackendApiKey) {
+        keyInput.value = "";
+        keyInput.placeholder = "Configurada en servidor (.env)";
+        if (keyIcon) {
+            keyIcon.style.color = "var(--accent)";
+            keyIcon.title = "Clave API configurada en archivo .env del servidor";
+        }
+    } else {
+        keyInput.value = "";
+        keyInput.placeholder = "Gemini API Key...";
+        if (keyIcon) {
+            keyIcon.style.color = "var(--text-muted)";
+            keyIcon.title = "Sin clave API configurada";
+        }
+    }
+}
+
 // Verificar si el servidor ya tiene la API Key configurada
 async function checkBackendConfig() {
     try {
@@ -318,16 +348,7 @@ async function checkBackendConfig() {
         if (data.hasFallbackKey) {
             state.hasBackendFallbackKey = true;
         }
-        
-        const keyInput = document.getElementById('gemini-api-key');
-        if (state.hasBackendApiKey) {
-            if (!state.apiKey) {
-                keyInput.placeholder = "Configurada en servidor (.env)";
-                keyInput.value = "";
-            } else {
-                keyInput.placeholder = "Gemini API Key...";
-            }
-        }
+        updateKeyStatusUI();
     } catch (e) {
         console.error("Error al obtener la configuración del backend:", e);
     }
@@ -450,13 +471,29 @@ function setupEventListeners() {
         setupTheme();
     });
 
-    // Guardar API Key de Gemini
-    document.getElementById('save-api-key-btn').addEventListener('click', () => {
-        const key = document.getElementById('gemini-api-key').value.trim();
-        state.apiKey = key;
-        localStorage.setItem('gemini_api_key', key);
-        showToast("Clave API guardada localmente", "success");
-    });
+    // Guardar o borrar API Key de Gemini
+    const saveKeyAction = () => {
+        const keyInput = document.getElementById('gemini-api-key');
+        if (!keyInput) return;
+        const key = keyInput.value.trim();
+        if (key) {
+            state.apiKey = key;
+            localStorage.setItem('gemini_api_key', key);
+            showToast("Clave API personalizada guardada", "success");
+        } else {
+            state.apiKey = '';
+            localStorage.removeItem('gemini_api_key');
+            if (state.hasBackendApiKey) {
+                showToast("Usando la clave API del archivo .env del servidor", "info");
+            } else {
+                showToast("Campo vacío: No hay clave API local guardada", "warning");
+            }
+        }
+        updateKeyStatusUI();
+    };
+
+    document.getElementById('save-api-key-btn').addEventListener('click', saveKeyAction);
+    document.getElementById('gemini-api-key').addEventListener('change', saveKeyAction);
 
     // Selección de Plantilla Presets
     const chips = document.querySelectorAll('.preset-chip');

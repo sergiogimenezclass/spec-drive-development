@@ -73,11 +73,17 @@
                     </select>
                 </div>
 
-                <!-- Clave API de Gemini -->
-                <div class="api-key-input-wrapper">
-                    <i class="fa-solid fa-key key-icon"></i>
-                    <input type="password" id="gemini-api-key" placeholder="Gemini API Key..." title="Ingresa tu Google AI Studio API Key">
-                    <button id="save-api-key-btn" title="Guardar clave localmente"><i class="fa-solid fa-floppy-disk"></i></button>
+                <!-- Clave API de Gemini y Enlace -->
+                <div class="api-key-container" style="display: flex; align-items: center; gap: 8px;">
+                    <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" class="btn-get-key" style="font-size: 11px; font-weight: 600; color: var(--accent); text-decoration: none; display: flex; align-items: center; gap: 4px; padding: 5px 9px; border-radius: var(--radius-md); background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.25); transition: background 0.2s;" title="Obtener API Key gratuita en Google AI Studio">
+                        <i class="fa-solid fa-arrow-up-right-from-square" style="font-size: 10px;"></i>
+                        <span>Obtener Key</span>
+                    </a>
+                    <div class="api-key-input-wrapper" title="Ingresa tu clave API de Google AI Studio">
+                        <i class="fa-solid fa-key key-icon" id="key-status-icon"></i>
+                        <input type="password" id="gemini-api-key" placeholder="Gemini API Key..." title="Ingresa tu Google AI Studio API Key">
+                        <button id="save-api-key-btn" title="Guardar clave en el navegador"><i class="fa-solid fa-floppy-disk"></i></button>
+                    </div>
                 </div>
 
                 <!-- Selector de Tema -->
