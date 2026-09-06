@@ -108,10 +108,25 @@ if not os.path.exists(static_dir):
 
 # Endpoints de la API
 
+# Estado global del progreso de generación de especificaciones
+GENERATION_STATUS: Dict[str, Any] = {
+    "is_generating": False,
+    "total_files": 17,
+    "current_index": 0,
+    "current_filename": "",
+    "completed_files": [],
+    "percent": 0
+}
+
 @app.get("/api/config")
 async def get_config():
     has_key = bool(os.environ.get("GEMINI_API_KEY"))
     return {"hasApiKey": has_key}
+
+@app.get("/api/generation-status")
+async def get_generation_status():
+    global GENERATION_STATUS
+    return GENERATION_STATUS
 
 @app.get("/api/project-path")
 async def get_project_path():
@@ -518,6 +533,7 @@ def clean_markdown(text: str) -> str:
 
 @app.post("/api/export-specs")
 async def export_specs(req: SaveProjectRequest, x_gemini_key: str = Header(None)):
+    global GENERATION_STATUS
     model = get_gemini_model(x_gemini_key)
     specs_dir = get_specs_dir()
     project_file = get_project_file()
@@ -542,6 +558,15 @@ async def export_specs(req: SaveProjectRequest, x_gemini_key: str = Header(None)
         "tasks.md", "decisions.md", "glossary.md", "agents.md"
     ]
     
+    GENERATION_STATUS = {
+        "is_generating": True,
+        "total_files": len(files_to_generate),
+        "current_index": 0,
+        "current_filename": "product.md",
+        "completed_files": [],
+        "percent": 0
+    }
+
     generated_files = []
     ai_markdowns = {}
     
@@ -555,6 +580,11 @@ async def export_specs(req: SaveProjectRequest, x_gemini_key: str = Header(None)
             if fname not in generated_files:
                 generated_files.append(fname)
             project["specModules"][fname.replace(".md", "").replace(".json", "")] = cleaned.strip()
+            
+            if fname not in GENERATION_STATUS["completed_files"]:
+                GENERATION_STATUS["completed_files"].append(fname)
+            
+            GENERATION_STATUS["percent"] = int((len(GENERATION_STATUS["completed_files"]) / GENERATION_STATUS["total_files"]) * 100)
             logger.info(f"Guardado inmediato en disco: {filepath}")
         except Exception as err:
             logger.error(f"Error escribiendo {fname} en disco: {str(err)}")
@@ -893,6 +923,9 @@ async def export_specs(req: SaveProjectRequest, x_gemini_key: str = Header(None)
     except Exception as e:
         logger.error(f"Error escribiendo en {project_file} en export_specs: {str(e)}")
         
+    GENERATION_STATUS["is_generating"] = False
+    GENERATION_STATUS["percent"] = 100
+
     return {
         "status": "success",
         "message": f"Se han generado {len(generated_files)} archivos de especificación en el directorio /specs/",

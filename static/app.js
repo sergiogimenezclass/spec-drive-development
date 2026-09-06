@@ -464,32 +464,40 @@ async function startDiscoveryFlow() {
             updateConceptualAnalysisPanel();
             
             // 2. Generar directamente las especificaciones con la IA
-            document.getElementById('loader-status-text').innerText = "Generando los 16 archivos de especificación en formato Markdown... (Esto puede tardar unos segundos)";
+            document.getElementById('loader-status-text').innerText = "Generando especificaciones en formato Markdown...";
             
             await saveProjectToServer(); // Guardar el proyecto en su estado inicial
+            startPollingGenerationStatus();
             
-            const exportResponse = await fetch('/api/export-specs', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Gemini-Key': state.apiKey
-                },
-                body: JSON.stringify({ project_data: state.currentProject })
-            });
-            
-            const exportData = await exportResponse.json();
-            if (exportData.status === 'success') {
-                // Cargar el proyecto con todos los specModules cargados
-                const loadResp = await fetch('/api/load-project');
-                const loadData = await loadResp.json();
+            try {
+                const exportResponse = await fetch('/api/export-specs', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Gemini-Key': state.apiKey
+                    },
+                    body: JSON.stringify({ project_data: state.currentProject })
+                });
                 
-                if (loadData.status === 'success' && loadData.project) {
-                    state.currentProject = loadData.project;
+                const exportData = await exportResponse.json();
+                stopPollingGenerationStatus();
+
+                if (exportData.status === 'success') {
+                    // Cargar el proyecto con todos los specModules cargados
+                    const loadResp = await fetch('/api/load-project');
+                    const loadData = await loadResp.json();
+                    
+                    if (loadData.status === 'success' && loadData.project) {
+                        state.currentProject = loadData.project;
+                    }
+                    showToast("Especificaciones generadas directamente con éxito", "success");
+                    loadWorkspace();
+                } else {
+                    throw new Error("La generación de especificaciones no devolvió éxito.");
                 }
-                showToast("Especificaciones generadas directamente con éxito", "success");
-                loadWorkspace();
-            } else {
-                throw new Error("La generación de especificaciones no devolvió éxito.");
+            } catch (exportErr) {
+                stopPollingGenerationStatus();
+                throw exportErr;
             }
         } catch (e) {
             console.error(e);
@@ -738,6 +746,7 @@ async function finishInterviewAndGenerateSpecs() {
     document.getElementById('loader-status-text').innerText = "Gemini está redactando todas tus especificaciones a partir de tus respuestas...";
     
     await saveProjectToServer();
+    startPollingGenerationStatus();
     
     try {
         const exportResponse = await fetch('/api/export-specs', {
@@ -750,6 +759,8 @@ async function finishInterviewAndGenerateSpecs() {
         });
         
         const exportData = await exportResponse.json();
+        stopPollingGenerationStatus();
+
         if (exportData.status === 'success') {
             const loadResp = await fetch('/api/load-project');
             const loadData = await loadResp.json();
@@ -764,6 +775,7 @@ async function finishInterviewAndGenerateSpecs() {
             loadWorkspace();
         }
     } catch (e) {
+        stopPollingGenerationStatus();
         console.error(e);
         showToast("Error de conexión al redactar especificaciones. Redirigiendo al Workspace.", "error");
         loadWorkspace();
@@ -1250,4 +1262,72 @@ async function submitFeatureGeneration() {
             showPlanningState('initial');
         }
     }, 1200);
+}
+
+// Consultar progreso de generación de especificaciones en tiempo real
+let generationPollInterval = null;
+
+function startPollingGenerationStatus() {
+    const container = document.getElementById('loader-progress-container');
+    if (container) container.classList.remove('hidden');
+
+    if (generationPollInterval) clearInterval(generationPollInterval);
+
+    generationPollInterval = setInterval(async () => {
+        try {
+            const resp = await fetch('/api/generation-status');
+            const data = await resp.json();
+            
+            if (data.is_generating || (data.completed_files && data.completed_files.length > 0)) {
+                const total = data.total_files || 17;
+                const completedCount = data.completed_files ? data.completed_files.length : 0;
+                const remaining = total - completedCount;
+                const percent = data.percent || Math.round((completedCount / total) * 100);
+                
+                const curFileEl = document.getElementById('loader-current-file');
+                if (curFileEl) {
+                    curFileEl.innerText = data.current_filename 
+                        ? `Redactando: ${data.current_filename}`
+                        : `Procesando especificaciones...`;
+                }
+
+                const statusTextEl = document.getElementById('loader-status-text');
+                if (statusTextEl) {
+                    statusTextEl.innerText = data.current_filename 
+                        ? `Generando ${data.current_filename} (${completedCount + 1} de ${total})...`
+                        : `Generando los 17 archivos de especificación en formato Markdown...`;
+                }
+
+                const badgeEl = document.getElementById('loader-percent-badge');
+                if (badgeEl) badgeEl.innerText = `${percent}%`;
+
+                const fillEl = document.getElementById('loader-progress-bar-fill');
+                if (fillEl) fillEl.style.width = `${percent}%`;
+
+                const countEl = document.getElementById('loader-count-text');
+                if (countEl) countEl.innerText = `${completedCount} de ${total} archivos generados`;
+
+                const remEl = document.getElementById('loader-remaining-text');
+                if (remEl) remEl.innerText = `Faltan ${remaining > 0 ? remaining : 0} archivos`;
+
+                const chipsContainer = document.getElementById('loader-completed-chips');
+                if (chipsContainer && data.completed_files) {
+                    chipsContainer.innerHTML = data.completed_files.map(f => 
+                        `<span style="font-size: 11px; background: rgba(0, 230, 118, 0.15); color: #00e676; padding: 2px 8px; border-radius: 12px; border: 1px solid rgba(0, 230, 118, 0.3);"><i class="fa-solid fa-check"></i> ${f}</span>`
+                    ).join('');
+                }
+            }
+        } catch (e) {
+            console.error("Error consultando estado de generación:", e);
+        }
+    }, 1000);
+}
+
+function stopPollingGenerationStatus() {
+    if (generationPollInterval) {
+        clearInterval(generationPollInterval);
+        generationPollInterval = null;
+    }
+    const container = document.getElementById('loader-progress-container');
+    if (container) container.classList.add('hidden');
 }

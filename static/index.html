@@ -172,10 +172,28 @@
                             <p>Gemini está analizando tu idea para formular preguntas inteligentes que den forma al software.</p>
                         </div>
 
-                        <!-- Cargador animado -->
+                        <!-- Cargador animado con avance en tiempo real -->
                         <div class="discovery-loader" id="discovery-loader">
                             <div class="spinner"></div>
-                            <p id="loader-status-text">Analizando idea y abstrayendo dominio...</p>
+                            <p id="loader-status-text" style="font-weight: 600; margin-bottom: 12px;">Analizando idea y abstrayendo dominio...</p>
+
+                            <!-- Barra e indicador de avance detallado -->
+                            <div id="loader-progress-container" class="hidden" style="width: 100%; max-width: 520px; margin-top: 16px; background: rgba(255,255,255,0.03); padding: 16px; border-radius: 12px; border: 1px solid var(--border-color);">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 13px; font-weight: 600;">
+                                    <span id="loader-current-file" style="color: var(--primary-hover);">Generando especificaciones...</span>
+                                    <span id="loader-percent-badge" class="badge">0%</span>
+                                </div>
+                                <div class="progress-track" style="height: 8px; background: rgba(255,255,255,0.08); border-radius: 4px; overflow: hidden;">
+                                    <div id="loader-progress-bar-fill" class="progress-fill" style="width: 0%; height: 100%; transition: width 0.3s ease;"></div>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; margin-top: 8px; font-size: 12px; color: var(--text-secondary);">
+                                    <span id="loader-count-text">0 de 17 archivos generados</span>
+                                    <span id="loader-remaining-text">Faltan 17 archivos</span>
+                                </div>
+                                <div id="loader-completed-chips" style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; justify-content: center; max-height: 120px; overflow-y: auto;">
+                                    <!-- Chips de archivos completados -->
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Preguntas del Wizard -->
@@ -372,6 +390,6 @@
     <!-- Notificaciones flotantes -->
     <div id="toast-container" class="toast-container"></div>
 
-    <script src="app.js?v=2.2.3"></script>
+    <script src="app.js?v=2.2.4"></script>
 </body>
 </html>
