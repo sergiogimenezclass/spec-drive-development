@@ -168,9 +168,23 @@ class GeminiChatSessionWrapper:
 
             # Priorizar detección de cuota (429) antes de cualquier reintento de fallback
             if is_quota_error(err_msg):
+                current_m = getattr(self.model_wrapper, 'model_name', '')
+                if "pro" in current_m.lower():
+                    logger.warning(f"Modelo Pro '{current_m}' sin cuota en plan gratuito. Intentando fallback a gemini-2.5-flash")
+                    key_to_use = self.key_used or (self.model_wrapper.primary_key if self.model_wrapper and self.model_wrapper.primary_key else os.environ.get("GEMINI_API_KEY", "")).strip()
+                    if key_to_use:
+                        try:
+                            genai.configure(api_key=key_to_use)
+                            m_fb = genai.GenerativeModel("gemini-2.5-flash")
+                            chat_fb = m_fb.start_chat(history=self.history, **self.kwargs)
+                            return chat_fb.send_message(content, **kwargs)
+                        except Exception as fb_e:
+                            logger.error(f"Fallback Pro -> Flash en chat falló: {fb_e}")
+                            err_msg = str(fb_e)
+
                 raise HTTPException(
                     status_code=429,
-                    detail=f"⚠️ Límite de Cuota Alcanzado (429/Quota Exceeded): {err_msg}. Ingresa una clave de resguardo o cambia el modelo en la interfaz."
+                    detail=f"⚠️ Límite de Cuota Alcanzado (429/Quota Exceeded): {err_msg}. Ingresa una clave de resguardo o cambia el modelo a Gemini 2.5 Flash en el header."
                 )
 
             # Si el modelo no existe, 404 o no disponible en la clave de la cuenta
@@ -242,6 +256,15 @@ class GeminiModelWrapper:
                 logger.warning(f"Intento {idx + 1} con modelo '{self.model_name}' falló: {e}")
 
                 if is_quota_error(err_str):
+                    if "pro" in self.model_name.lower():
+                        try:
+                            logger.info("Modelo Pro sin cuota en plan gratuito, intentando fallback a gemini-2.5-flash")
+                            m_fb = genai.GenerativeModel("gemini-2.5-flash")
+                            return m_fb.generate_content(contents, **kwargs)
+                        except Exception as sub_e:
+                            last_error = sub_e
+                            err_str = str(sub_e)
+
                     has_any_quota_err = True
                     quota_err_str = err_str
                     continue
@@ -307,6 +330,15 @@ class GeminiModelWrapper:
                 logger.warning(f"start_chat intento {idx + 1} con modelo '{self.model_name}' falló: {e}")
 
                 if is_quota_error(err_str):
+                    if "pro" in self.model_name.lower():
+                        try:
+                            logger.info("Modelo Pro sin cuota en plan gratuito para start_chat, intentando fallback a gemini-2.5-flash")
+                            m_fb = genai.GenerativeModel("gemini-2.5-flash")
+                            return GeminiChatSessionWrapper(m_fb, history=history, model_wrapper=self, key_used=key, **kwargs)
+                        except Exception as sub_e:
+                            last_error = sub_e
+                            err_str = str(sub_e)
+
                     has_any_quota_err = True
                     quota_err_str = err_str
                     continue
