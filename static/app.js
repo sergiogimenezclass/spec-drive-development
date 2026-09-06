@@ -2113,14 +2113,18 @@ function appendCopilotTyping() {
     const container = document.getElementById('copilot-messages');
     if (!container) return null;
 
+    // Remover indicadores previos por seguridad
+    document.querySelectorAll('.copilot-typing-msg').forEach(el => el.remove());
+
     const typingId = 'copilot-typing-' + Date.now();
     const msgDiv = document.createElement('div');
     msgDiv.id = typingId;
-    msgDiv.className = 'copilot-msg msg-ai';
+    msgDiv.className = 'copilot-msg msg-ai copilot-typing-msg';
     msgDiv.innerHTML = `
-        <div class="msg-avatar"><i class="fa-solid fa-robot"></i></div>
-        <div class="msg-body" style="font-style: italic; color: var(--text-secondary);">
-            <i class="fa-solid fa-spinner fa-spin"></i> Consultando especificaciones...
+        <div class="msg-avatar"><i class="fa-solid fa-robot" style="color: var(--primary);"></i></div>
+        <div class="msg-body" style="font-style: italic; color: var(--text-secondary); display: flex; align-items: center; gap: 8px;">
+            <i class="fa-solid fa-circle-notch fa-spin" style="color: var(--accent); font-size: 14px;"></i>
+            <span>Spec Copilot analizando respuesta...</span>
         </div>
     `;
     container.appendChild(msgDiv);
@@ -2129,7 +2133,9 @@ function appendCopilotTyping() {
 }
 
 function removeCopilotTyping(typingId) {
-    if (!typingId) return;
-    const el = document.getElementById(typingId);
-    if (el) el.remove();
+    if (typingId) {
+        const el = document.getElementById(typingId);
+        if (el) el.remove();
+    }
+    document.querySelectorAll('.copilot-typing-msg').forEach(el => el.remove());
 }
