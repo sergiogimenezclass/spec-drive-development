@@ -129,21 +129,21 @@
                                     <div class="path-option active" data-path="guided" id="path-guided">
                                         <div class="path-option-icon"><i class="fa-solid fa-comments"></i></div>
                                         <div class="path-option-info">
-                                            <span class="path-title">Entrevista Guiada (Camino 2)</span>
-                                            <span class="path-desc">Gemini te formulará preguntas progresivas para refinar especificaciones y requisitos.</span>
+                                            <span class="path-title">Modo 1: Explore Chat + Wizard Inteligente (Recomendado)</span>
+                                            <span class="path-desc">Charla informal previa con el Spec Copilot. La IA extraerá automáticamente las respuestas para pre-llenar el cuestionario.</span>
                                         </div>
                                     </div>
                                     <div class="path-option" data-path="direct" id="path-direct">
                                         <div class="path-option-icon"><i class="fa-solid fa-bolt"></i></div>
                                         <div class="path-option-info">
-                                            <span class="path-title">Generación Directa (Camino 1)</span>
-                                            <span class="path-desc">Omitir preguntas. La IA generará los 16 módulos de especificaciones directamente.</span>
+                                            <span class="path-title">Modo 2: Generación Directa (Sin Chat)</span>
+                                            <span class="path-desc">Omitir la charla. Ir directo al cuestionario o redactar especificaciones inmediatamente.</span>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                             <button id="start-discovery-btn" class="btn btn-primary btn-full-width">
-                                <span>Iniciar Descubrimiento con Gemini</span>
+                                <span>Iniciar Explore Chat con Gemini</span>
                                 <i class="fa-solid fa-arrow-right"></i>
                             </button>
                         </div>
@@ -353,6 +353,9 @@
                                 </div>
                             </div>
                             <div style="display: flex; gap: 6px; align-items: center;">
+                                <button id="btn-explore-finish-wizard" class="btn btn-primary btn-sm hidden" style="background: linear-gradient(135deg, #10b981, #059669); color: white; border: none; font-weight: 600; padding: 6px 12px; font-size: 12px;" title="Analizar charla con IA y completar cuestionario">
+                                     <i class="fa-solid fa-clipboard-check"></i> Revisar Cuestionario & Redactar Specs
+                                </button>
                                 <button id="btn-expand-copilot" class="btn-icon" title="Expandir chat a pantalla completa / modo amplio"><i class="fa-solid fa-expand"></i></button>
                                 <button id="btn-clear-copilot" class="btn-icon" title="Limpiar conversación"><i class="fa-solid fa-trash-can"></i></button>
                                 <button id="btn-close-copilot" class="btn-icon" title="Cerrar chat"><i class="fa-solid fa-xmark"></i></button>

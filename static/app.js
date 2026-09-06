@@ -507,11 +507,13 @@ function setupEventListeners() {
     const clearCopilotBtn = document.getElementById('btn-clear-copilot');
     const sendCopilotBtn = document.getElementById('btn-send-copilot');
     const copilotInput = document.getElementById('copilot-input');
+    const exploreFinishWizardBtn = document.getElementById('btn-explore-finish-wizard');
 
     if (toggleCopilotBtn) toggleCopilotBtn.addEventListener('click', toggleCopilotPanel);
     if (closeCopilotBtn) closeCopilotBtn.addEventListener('click', toggleCopilotPanel);
     if (clearCopilotBtn) clearCopilotBtn.addEventListener('click', clearCopilotChat);
     if (sendCopilotBtn) sendCopilotBtn.addEventListener('click', () => sendCopilotMessage());
+    if (exploreFinishWizardBtn) exploreFinishWizardBtn.addEventListener('click', extractAnswersAndLaunchWizard);
 
     if (expandCopilotBtn) {
         expandCopilotBtn.addEventListener('click', () => {
@@ -713,11 +715,10 @@ async function startDiscoveryFlow() {
     
     await saveProjectToServer();
     
-    showScreen('screen-discovery');
-    document.getElementById('discovery-loader').classList.remove('hidden');
-    document.getElementById('wizard-container').classList.add('hidden');
-    
     if (state.generationPath === 'direct') {
+        showScreen('screen-discovery');
+        document.getElementById('discovery-loader').classList.remove('hidden');
+        document.getElementById('wizard-container').classList.add('hidden');
         document.getElementById('loader-status-text').innerText = "Gemini está analizando conceptualmente tu idea...";
         
         try {
@@ -737,13 +738,12 @@ async function startDiscoveryFlow() {
             state.currentProject.metadata.actors = data.actors || [];
             state.currentProject.metadata.features = data.detectedFeatures || [];
             
-            // Actualizar panel lateral conceptual
             updateConceptualAnalysisPanel();
             
             // 2. Generar directamente las especificaciones con la IA
             document.getElementById('loader-status-text').innerText = "Generando especificaciones en formato Markdown...";
             
-            await saveProjectToServer(); // Guardar el proyecto en su estado inicial
+            await saveProjectToServer();
             startPollingGenerationStatus();
             
             try {
@@ -760,7 +760,6 @@ async function startDiscoveryFlow() {
                 stopPollingGenerationStatus();
 
                 if (exportData.status === 'success') {
-                    // Cargar el proyecto con todos los specModules cargados
                     const loadResp = await fetch('/api/load-project');
                     const loadData = await loadResp.json();
                     
@@ -782,44 +781,135 @@ async function startDiscoveryFlow() {
             showScreen('screen-dashboard');
         }
     } else {
-        // Camino 2: Entrevista Guiada
-        document.getElementById('loader-status-text').innerText = "Gemini está formulando preguntas inteligentes para tu proyecto...";
-        
+        // Modo 1: Explore Chat + Wizard Inteligente
+        showToast("Modo Explore activado. Habla con Spec Copilot para definir tu producto.", "info");
+
+        // Limpiar o reiniciar chat para el nuevo proyecto
+        state.copilotHistory = [];
         try {
-            const response = await fetch('/api/analyze-idea', {
+            await fetch('/api/copilot-clear-history', { method: 'POST' });
+        } catch (e) {}
+
+        // Abrir Workspace con Copilot desplegado
+        loadWorkspace();
+
+        const copilotPanel = document.getElementById('workspace-copilot-panel');
+        if (copilotPanel) {
+            copilotPanel.classList.remove('hidden');
+            copilotPanel.classList.add('expanded');
+        }
+
+        const exploreBtn = document.getElementById('btn-explore-finish-wizard');
+        if (exploreBtn) exploreBtn.classList.remove('hidden');
+
+        // Mensaje de bienvenida de Spec Copilot en Explore
+        const welcomeMsg = `¡Hola! He registrado la idea inicial para **${name}**:\n> *"${seedIdea}"*\n\nPodemos charlar libremente sobre las funcionalidades que imaginas, los usuarios principales, reglas de negocio o tecnología.\n\nCuando estés listo para generar las especificaciones, haz clic en el botón verde arriba a la derecha: **📋 Revisar Cuestionario & Redactar Specs**.`;
+
+        state.copilotHistory = [
+            { role: 'model', content: welcomeMsg }
+        ];
+
+        try {
+            await fetch('/api/copilot-chat', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-Gemini-Key': state.apiKey
+                    'X-Gemini-Key': state.apiKey || ''
                 },
-                body: JSON.stringify({ idea: seedIdea })
+                body: JSON.stringify({
+                    message: "__init_explore__",
+                    history: state.copilotHistory,
+                    project_data: state.currentProject
+                })
             });
-            
-            const data = await response.json();
-            
-            // Cargar árbol de preguntas dinámicas y metadatos
-            state.questionTree = data.questions || [];
-            state.currentProject.metadata.domain = data.domain || 'Por definir';
-            state.currentProject.metadata.productType = data.productType || 'SaaS';
-            state.currentProject.metadata.actors = data.actors || [];
-            state.currentProject.metadata.features = data.detectedFeatures || [];
-            
-            // Actualizar UI del panel lateral conceptual
-            updateConceptualAnalysisPanel();
-            
-            // Iniciar Wizard
-            state.dynamicRounds = 0;
-            state.activeQuestionIndex = 0;
-            document.getElementById('discovery-loader').classList.add('hidden');
-            document.getElementById('wizard-container').classList.remove('hidden');
-            renderWizardQuestion();
-            
-        } catch (e) {
-            console.error(e);
-            showToast("Error de conexión con la IA. Se cargaron preguntas de fallback.", "error");
-            document.getElementById('discovery-loader').classList.add('hidden');
-            document.getElementById('wizard-container').classList.remove('hidden');
+        } catch (e) {}
+
+        const container = document.getElementById('copilot-messages');
+        if (container) {
+            container.innerHTML = '';
+            appendCopilotMsg('ai', welcomeMsg, true);
         }
+    }
+}
+
+// Extraer respuestas de la charla de Explore y abrir el Wizard pre-llenado
+async function extractAnswersAndLaunchWizard() {
+    showToast("Gemini está analizando la conversación para pre-llenar tu cuestionario...", "info");
+
+    try {
+        const extractResp = await fetch('/api/explore-extract-answers', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Gemini-Key': state.apiKey || ''
+            },
+            body: JSON.stringify({
+                history: state.copilotHistory || []
+            })
+        });
+        const extractData = await extractResp.json();
+
+        let extractedAnswers = extractData.answers || extractData.extracted_answers || {};
+
+        // Obtener questionTree si no existe
+        if (!state.questionTree || state.questionTree.length === 0) {
+            try {
+                const analyzeResp = await fetch('/api/analyze-idea', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Gemini-Key': state.apiKey || ''
+                    },
+                    body: JSON.stringify({ idea: (state.currentProject && state.currentProject.seedIdea) || '' })
+                });
+                const analyzeData = await analyzeResp.json();
+                state.questionTree = analyzeData.questions || [];
+            } catch (aErr) {
+                console.error("Error al obtener árbol de preguntas:", aErr);
+            }
+        }
+
+        // Pre-llenar respuestas en el objeto del proyecto
+        if (!state.currentProject) state.currentProject = {};
+        if (!state.currentProject.answers) state.currentProject.answers = {};
+
+        if (state.questionTree && state.questionTree.length > 0) {
+            state.questionTree.forEach(q => {
+                const val = extractedAnswers[q.id];
+                if (val) {
+                    if (q.type === 'select' && q.options) {
+                        const matchedOpt = q.options.find(opt => 
+                            opt.toLowerCase().includes(val.toLowerCase()) || 
+                            val.toLowerCase().includes(opt.toLowerCase())
+                        );
+                        state.currentProject.answers[q.id] = matchedOpt || val;
+                    } else {
+                        state.currentProject.answers[q.id] = val;
+                    }
+                }
+            });
+        }
+
+        await saveProjectToServer();
+
+        // Transición al Wizard en screen-discovery
+        showScreen('screen-discovery');
+        document.getElementById('discovery-loader').classList.add('hidden');
+        document.getElementById('wizard-container').classList.remove('hidden');
+
+        state.activeQuestionIndex = 0;
+        state.dynamicRounds = 0;
+        renderWizardQuestion();
+
+        showToast("Cuestionario pre-llenado exitosamente. Revisa tus opciones y haz clic en Finalizar.", "success");
+
+    } catch (err) {
+        console.error("Error extrayendo respuestas del Explore Chat:", err);
+        showToast("No se pudieron extraer automáticamente las respuestas, pero puedes completarlas manualmente.", "warning");
+        showScreen('screen-discovery');
+        document.getElementById('discovery-loader').classList.add('hidden');
+        document.getElementById('wizard-container').classList.remove('hidden');
+        renderWizardQuestion();
     }
 }
 
@@ -1065,6 +1155,16 @@ function loadWorkspace() {
     selectSpecFile('product.md');
     saveProjectToServer();
     loadCopilotHistory();
+
+    const hasGeneratedSpecs = state.currentProject && state.currentProject.specModules && Object.keys(state.currentProject.specModules).length > 0 && state.currentProject.specModules['product.md'];
+    const exploreBtn = document.getElementById('btn-explore-finish-wizard');
+    if (exploreBtn) {
+        if (hasGeneratedSpecs) {
+            exploreBtn.classList.add('hidden');
+        } else {
+            exploreBtn.classList.remove('hidden');
+        }
+    }
 }
 
 // Renderizar el árbol lateral de especificaciones
@@ -1121,41 +1221,32 @@ function renderSpecTree() {
             nav.appendChild(folderItem);
             
             folders[folderName].forEach(feat => {
-                const fileKey = `features/${folderName}/${feat.id}`;
-                const item = document.createElement('div');
-                item.className = `spec-tree-item ${state.activeSpecFile === fileKey ? 'active' : ''}`;
-                item.style.paddingLeft = '32px';
-                
-                item.innerHTML = `
+                const fItem = document.createElement('div');
+                fItem.className = `spec-tree-item feature-item ${state.activeSpecFile === feat.filename ? 'active' : ''}`;
+                fItem.style.paddingLeft = "28px";
+                fItem.innerHTML = `
                     <div class="spec-item-left">
-                        <i class="fa-regular fa-file-lines" style="font-size: 11px;"></i>
-                        <span>${feat.name}</span>
+                        <i class="fa-regular fa-file-code" style="font-size: 11px;"></i>
+                        <span>${feat.title || feat.filename}</span>
                     </div>
-                    <span class="spec-status-indicator status-completed"></span>
                 `;
-                
-                item.addEventListener('click', () => {
-                    selectSpecFile(fileKey);
+                fItem.addEventListener('click', () => {
+                    selectSpecFile(feat.filename);
                 });
-                
-                nav.appendChild(item);
+                nav.appendChild(fItem);
             });
         });
     }
 }
 
-// Seleccionar archivo activo en el IDE
+// Seleccionar un archivo de especificación en el editor
 function selectSpecFile(filename) {
     state.activeSpecFile = filename;
     document.getElementById('active-spec-title').innerText = filename;
     
-    // Cambiar clase activa en el árbol
     renderSpecTree();
-    
-    // Actualizar el banner informativo del editor
     updateSpecInfoBanner(filename);
 
-    // Cargar contenido Markdown y renderizarlo
     const moduleName = filename.replace('.md', '').replace('.json', '');
     const mdContent = (state.currentProject.specModules && state.currentProject.specModules[moduleName]) || '';
     renderMarkdownHTML(mdContent);
@@ -1209,12 +1300,15 @@ function renderOnboardingGrid(filterCategory = 'all') {
             </div>
         `;
 
-        card.querySelector('.open-spec-btn').addEventListener('click', () => {
-            const onboardingModal = document.getElementById('onboarding-modal');
-            if (onboardingModal) onboardingModal.classList.add('hidden');
-            loadWorkspace();
-            selectSpecFile(fname);
-        });
+        const openBtn = card.querySelector('.open-spec-btn');
+        if (openBtn) {
+            openBtn.addEventListener('click', () => {
+                const onboardingModal = document.getElementById('onboarding-modal');
+                if (onboardingModal) onboardingModal.classList.add('hidden');
+                loadWorkspace();
+                selectSpecFile(fname);
+            });
+        }
 
         container.appendChild(card);
     });
@@ -1226,29 +1320,30 @@ function renderMarkdownHTML(md) {
     if (!md || !md.trim()) {
         pane.innerHTML = `
             <div class="empty-spec-state" style="text-align: center; padding: 48px var(--spacing-lg); background: rgba(255,255,255,0.015); border: 1px dashed var(--border-color); border-radius: var(--radius-lg); margin-top: 20px;">
-                <div style="width: 56px; height: 56px; border-radius: 50%; background: linear-gradient(135deg, rgba(123,97,255,0.2), rgba(255,107,157,0.2)); display: flex; align-items: center; justify-content: center; margin: 0 auto 16px auto;">
-                    <i class="fa-solid fa-wand-magic-sparkles" style="font-size: 24px; color: var(--primary);"></i>
+                <div style="width: 56px; height: 56px; border-radius: 50%; background: linear-gradient(135deg, rgba(16,185,129,0.2), rgba(59,130,246,0.2)); display: flex; align-items: center; justify-content: center; margin: 0 auto 16px auto;">
+                    <i class="fa-solid fa-comments" style="font-size: 24px; color: #10b981;"></i>
                 </div>
-                <h3 style="margin-bottom: 8px; font-weight: 700; color: var(--text-primary);">Especificaciones aún no redactadas</h3>
-                <p style="color: var(--text-secondary); max-width: 520px; margin: 0 auto 20px auto; font-size: 13.5px; line-height: 1.6;">
-                    El proyecto "<strong>${state.currentProject.name || 'Sin título'}</strong>" está configurado. Haz clic en el botón a continuación para que Gemini redacte automáticamente los 17 archivos de especificaciones Markdown en la carpeta de este proyecto.
+                <h3 style="margin-bottom: 8px; font-weight: 700; color: var(--text-primary);">Fase de Exploración en Curso</h3>
+                <p style="color: var(--text-secondary); max-width: 540px; margin: 0 auto 20px auto; font-size: 13.5px; line-height: 1.6;">
+                    Estás definiendo la idea de "<strong>${(state.currentProject && state.currentProject.name) || 'Sin título'}</strong>" con el <strong>Spec Copilot</strong>. <br>
+                    Cuando termines la charla previa, presiona el botón verde a continuación para que la IA pre-llene tu cuestionario y redacte las especificaciones.
                 </p>
                 <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
-                    <button id="btn-generate-specs-now" class="btn btn-primary" style="background: linear-gradient(135deg, var(--primary), var(--accent)); color: white; border: none; padding: 10px 20px; font-weight: 600;">
-                        <i class="fa-solid fa-play"></i> Redactar Especificaciones con Gemini
+                    <button id="btn-empty-review-wizard" class="btn btn-primary" style="background: linear-gradient(135deg, #10b981, #059669); color: white; border: none; padding: 10px 20px; font-weight: 600;">
+                        <i class="fa-solid fa-clipboard-check"></i> 📋 Revisar Cuestionario & Redactar Specs
                     </button>
-                    <button id="btn-single-autocomplete" class="btn btn-border" style="padding: 10px 16px;">
-                        <i class="fa-solid fa-file-pen"></i> Redactar solo este archivo (${state.activeSpecFile})
+                    <button id="btn-generate-specs-now" class="btn btn-border" style="padding: 10px 16px;">
+                        <i class="fa-solid fa-bolt"></i> Generar Specs Directamente
                     </button>
                 </div>
             </div>
         `;
 
+        const reviewBtn = document.getElementById('btn-empty-review-wizard');
+        if (reviewBtn) reviewBtn.addEventListener('click', extractAnswersAndLaunchWizard);
+
         const genNowBtn = document.getElementById('btn-generate-specs-now');
         if (genNowBtn) genNowBtn.addEventListener('click', exportSpecsToDisk);
-
-        const singleBtn = document.getElementById('btn-single-autocomplete');
-        if (singleBtn) singleBtn.addEventListener('click', autocompleteActiveSection);
         return;
     }
     

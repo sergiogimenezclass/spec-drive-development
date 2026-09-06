@@ -130,6 +130,10 @@ class CopilotChatRequest(BaseModel):
     history: Optional[List[Dict[str, str]]] = []
     project_data: Dict[str, Any]
 
+class ExploreExtractRequest(BaseModel):
+    idea: Optional[str] = ""
+    history: List[Dict[str, Any]] = []
+
 class AutocompleteFileRequest(BaseModel):
     project_data: Dict[str, Any]
     filename: str
@@ -1438,6 +1442,79 @@ async def clear_copilot_history_endpoint():
         except Exception as e:
             logger.error(f"Error eliminando chat_history.json: {str(e)}")
     return {"status": "success", "message": "Historial de chat borrado"}
+
+@app.post("/api/explore-extract-answers")
+async def explore_extract_answers(req: ExploreExtractRequest, x_gemini_key: str = Header(None)):
+    try:
+        model = get_gemini_model(x_gemini_key)
+        
+        chat_text_list = []
+        for msg in req.history:
+            role = "Usuario" if msg.get("role") == "user" else "IA (Spec Copilot)"
+            content = msg.get("content", "")
+            if content:
+                chat_text_list.append(f"{role}: {content}")
+
+        chat_history_str = "\n".join(chat_text_list)
+        
+        prompt = f"""
+Eres un Arquitecto de Software y Analista de Requisitos Senior.
+Analiza la siguiente conversación de exploración inicial ("Explore") entre el usuario y la IA sobre la idea del proyecto: "{req.idea}".
+
+HISTORIAL DE LA CONVERSACIÓN:
+{chat_history_str}
+
+TU OBJETIVO:
+Extraer y deducir las respuestas más probables para los siguientes parámetros clave de arquitectura.
+Devuelve ÚNICAMENTE un objeto JSON válido con las siguientes claves y selecciona la opción que mejor corresponda basada en la charla (o la sugerencia por defecto más lógica si no se mencionó explícitamente):
+
+1. "q_auth": Selecciona exactamente uno entre:
+   - "Sin autenticación / Local"
+   - "Email y Contraseña tradicional"
+   - "OAuth Social (Google, GitHub)"
+   - "Magic Links / Passwordless"
+   - "Tokens JWT con Refresh Tokens"
+
+2. "q_database": Selecciona exactamente uno entre:
+   - "Local SQLite / JSON"
+   - "Relacional (PostgreSQL/MySQL)"
+   - "NoSQL (MongoDB/Firestore)"
+   - "Vector DB (Pinecone/Chroma)"
+   - "Sin base de datos (Memoria)"
+
+3. "q_user_roles_client_booking": Resumen breve de los roles y actores identificados (máximo 15 palabras).
+
+4. "q_notifications_strategy": Selecciona exactamente uno entre:
+   - "Sin notificaciones"
+   - "Solo Email"
+   - "WhatsApp y SMS"
+   - "Notificaciones Push Web/Mobile"
+
+5. "q_payment_integration": Selecciona exactamente uno entre:
+   - "No contempla pagos"
+   - "Mercado Pago"
+   - "Stripe"
+   - "Suscripciones Recurrentes"
+
+6. "q_features_core": Resumen sintético del alcance del MVP (máximo 20 palabras).
+
+Devuelve ÚNICAMENTE el objeto JSON sin envolver en bloques de código markdown ni texto adicional.
+"""
+        response = model.generate_content(prompt)
+        cleaned = clean_markdown(response.text.strip())
+        extracted_data = json.loads(cleaned)
+        return {"status": "success", "answers": extracted_data}
+    except Exception as e:
+        logger.error(f"Error extrayendo respuestas de explore: {str(e)}")
+        return {
+            "status": "partial",
+            "answers": {
+                "q_auth": "Sin autenticación / Local",
+                "q_database": "Local SQLite / JSON",
+                "q_notifications_strategy": "Sin notificaciones",
+                "q_payment_integration": "No contempla pagos"
+            }
+        }
 
 @app.post("/api/open-specs-folder")
 async def open_specs_folder():
