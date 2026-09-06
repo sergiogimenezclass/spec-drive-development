@@ -306,7 +306,10 @@
                                 <h2 id="active-spec-title">product.md</h2>
                             </div>
                             <div class="editor-actions" style="display: flex; gap: 8px;">
-                                <button id="btn-copy-agent-prompt" class="btn btn-primary btn-sm" title="Copiar prompt para Open Code / Cursor">
+                                <button id="btn-toggle-copilot" class="btn btn-primary btn-sm" style="background: linear-gradient(135deg, var(--primary), var(--accent)); color: white; border: none;" title="Hablar con la IA sobre el proyecto">
+                                    <i class="fa-solid fa-comments"></i> Spec Copilot
+                                </button>
+                                <button id="btn-copy-agent-prompt" class="btn btn-border btn-sm" title="Copiar prompt para Open Code / Cursor">
                                     <i class="fa-solid fa-copy"></i> Copiar Prompt Dev
                                 </button>
                                 <button id="btn-ai-autocomplete" class="btn btn-border btn-sm" title="Autocompletar contenido con Gemini">
@@ -336,6 +339,57 @@
                             </div>
                         </div>
                     </section>
+
+                    <!-- PANEL DERECHO: SPEC COPILOT CHAT -->
+                    <aside id="workspace-copilot-panel" class="copilot-panel hidden">
+                        <div class="copilot-header">
+                            <div class="copilot-header-title">
+                                <div class="copilot-avatar">
+                                    <i class="fa-solid fa-robot"></i>
+                                </div>
+                                <div>
+                                    <h4 style="margin:0; font-size: 14px; font-weight: 700; color: var(--text-primary);">Spec Copilot</h4>
+                                    <span class="copilot-status" style="font-size: 11px; color: var(--text-secondary);"><i class="fa-solid fa-circle" style="font-size: 8px; color: #10b981;"></i> Conectado al proyecto</span>
+                                </div>
+                            </div>
+                            <div style="display: flex; gap: 4px;">
+                                <button id="btn-clear-copilot" class="btn-icon" title="Limpiar conversación"><i class="fa-solid fa-trash-can"></i></button>
+                                <button id="btn-close-copilot" class="btn-icon" title="Cerrar chat"><i class="fa-solid fa-xmark"></i></button>
+                            </div>
+                        </div>
+
+                        <!-- SUGERENCIAS RÁPIDAS DE PREGUNTAS -->
+                        <div class="copilot-quick-chips">
+                            <span class="chip-title">Preguntas frecuentes:</span>
+                            <div class="chips-container">
+                                <button class="copilot-chip" data-query="¿De qué trata este proyecto y cuál es su propuesta de valor?">💡 ¿De qué trata el proyecto?</button>
+                                <button class="copilot-chip" data-query="¿Qué pila tecnológica y base de datos se eligieron?">🛠️ ¿Tech stack y DB?</button>
+                                <button class="copilot-chip" data-query="¿Cómo se maneja la autenticación y la seguridad?">🔐 Auth y Seguridad</button>
+                                <button class="copilot-chip" data-query="¿Qué endpoints de la API están definidos?">📡 Endpoints de API</button>
+                                <button class="copilot-chip" data-query="¿Cuáles son las reglas de negocio principales del modelo?">📋 Reglas de negocio</button>
+                            </div>
+                        </div>
+
+                        <!-- MENSAJES DEL CHAT -->
+                        <div id="copilot-messages" class="copilot-messages">
+                            <div class="copilot-msg msg-ai">
+                                <div class="msg-avatar"><i class="fa-solid fa-robot"></i></div>
+                                <div class="msg-body">
+                                    <p>¡Hola! Soy tu <strong>Spec Copilot</strong>. Conozco todas las especificaciones de este proyecto. ¿Qué te gustaría saber o consultar?</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ENTRADA DE TEXTO -->
+                        <div class="copilot-input-area">
+                            <div class="copilot-input-wrapper">
+                                <textarea id="copilot-input" placeholder="Pregunta sobre el proyecto..." rows="1"></textarea>
+                                <button id="btn-send-copilot" class="btn-send" title="Enviar mensaje">
+                                    <i class="fa-solid fa-paper-plane"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </aside>
 
 
 

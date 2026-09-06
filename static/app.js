@@ -25,7 +25,8 @@ const state = {
     isDarkTheme: false,
     hasBackendApiKey: false,
     generationPath: 'guided',
-    dynamicRounds: 0
+    dynamicRounds: 0,
+    copilotHistory: []
 };
 
 // Estructura fija de los 16 archivos de la spec
@@ -460,8 +461,35 @@ function setupEventListeners() {
         btn.addEventListener('click', () => {
             tabBtns.forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
-            const category = btn.dataset.tab;
-            renderOnboardingGrid(category);
+            renderOnboardingGrid(btn.dataset.category);
+        });
+    });
+
+    // Spec Copilot Event Listeners
+    const toggleCopilotBtn = document.getElementById('btn-toggle-copilot');
+    const closeCopilotBtn = document.getElementById('btn-close-copilot');
+    const clearCopilotBtn = document.getElementById('btn-clear-copilot');
+    const sendCopilotBtn = document.getElementById('btn-send-copilot');
+    const copilotInput = document.getElementById('copilot-input');
+
+    if (toggleCopilotBtn) toggleCopilotBtn.addEventListener('click', toggleCopilotPanel);
+    if (closeCopilotBtn) closeCopilotBtn.addEventListener('click', toggleCopilotPanel);
+    if (clearCopilotBtn) clearCopilotBtn.addEventListener('click', clearCopilotChat);
+    if (sendCopilotBtn) sendCopilotBtn.addEventListener('click', () => sendCopilotMessage());
+
+    if (copilotInput) {
+        copilotInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendCopilotMessage();
+            }
+        });
+    }
+
+    document.querySelectorAll('.copilot-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+            const query = chip.getAttribute('data-query');
+            if (query) sendCopilotMessage(query);
         });
     });
 
@@ -1587,4 +1615,126 @@ function stopPollingGenerationStatus() {
     }
     const container = document.getElementById('loader-progress-container');
     if (container) container.classList.add('hidden');
+}
+
+/* ==========================================================================
+   SPEC COPILOT CHAT LOGIC
+   ========================================================================== */
+
+function toggleCopilotPanel() {
+    const panel = document.getElementById('workspace-copilot-panel');
+    if (!panel) return;
+    panel.classList.toggle('hidden');
+}
+
+function clearCopilotChat() {
+    state.copilotHistory = [];
+    const container = document.getElementById('copilot-messages');
+    if (container) {
+        container.innerHTML = `
+            <div class="copilot-msg msg-ai">
+                <div class="msg-avatar"><i class="fa-solid fa-robot"></i></div>
+                <div class="msg-body">
+                    <p>Conversación reiniciada. ¿En qué más puedo ayudarte sobre las especificaciones del proyecto?</p>
+                </div>
+            </div>
+        `;
+    }
+}
+
+async function sendCopilotMessage(queryText) {
+    const inputEl = document.getElementById('copilot-input');
+    const text = queryText || (inputEl ? inputEl.value.trim() : '');
+    if (!text) return;
+
+    if (inputEl) inputEl.value = '';
+
+    const container = document.getElementById('copilot-messages');
+    if (!container) return;
+
+    // 1. Renderizar mensaje del usuario
+    appendCopilotMsg('user', text);
+
+    // 2. Renderizar indicador "Pensando..."
+    const typingId = appendCopilotTyping();
+
+    try {
+        const resp = await fetch('/api/copilot-chat', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Gemini-Key': state.apiKey || ''
+            },
+            body: JSON.stringify({
+                message: text,
+                history: state.copilotHistory || [],
+                project_data: state.currentProject
+            })
+        });
+
+        const data = await resp.json();
+        removeCopilotTyping(typingId);
+
+        if (data.status === 'success' && data.reply) {
+            if (!state.copilotHistory) state.copilotHistory = [];
+            state.copilotHistory.push({ role: 'user', content: text });
+            state.copilotHistory.push({ role: 'model', content: data.reply });
+
+            appendCopilotMsg('ai', data.reply);
+        } else {
+            const errDetail = data.detail || data.message || "Error al comunicarse con el Copilot.";
+            appendCopilotMsg('ai', `⚠️ ${errDetail}`);
+        }
+    } catch (e) {
+        removeCopilotTyping(typingId);
+        console.error("Error en sendCopilotMessage:", e);
+        appendCopilotMsg('ai', `⚠️ Error de conexión: ${e.message}`);
+    }
+}
+
+function appendCopilotMsg(role, text) {
+    const container = document.getElementById('copilot-messages');
+    if (!container) return;
+
+    const msgDiv = document.createElement('div');
+    msgDiv.className = `copilot-msg msg-${role}`;
+
+    const parsedHTML = (typeof marked !== 'undefined' && marked.parse) ? marked.parse(text) : `<p>${text}</p>`;
+
+    msgDiv.innerHTML = `
+        <div class="msg-avatar">
+            <i class="fa-solid ${role === 'user' ? 'fa-user' : 'fa-robot'}"></i>
+        </div>
+        <div class="msg-body">
+            ${parsedHTML}
+        </div>
+    `;
+
+    container.appendChild(msgDiv);
+    container.scrollTop = container.scrollHeight;
+}
+
+function appendCopilotTyping() {
+    const container = document.getElementById('copilot-messages');
+    if (!container) return null;
+
+    const typingId = 'copilot-typing-' + Date.now();
+    const msgDiv = document.createElement('div');
+    msgDiv.id = typingId;
+    msgDiv.className = 'copilot-msg msg-ai';
+    msgDiv.innerHTML = `
+        <div class="msg-avatar"><i class="fa-solid fa-robot"></i></div>
+        <div class="msg-body" style="font-style: italic; color: var(--text-secondary);">
+            <i class="fa-solid fa-spinner fa-spin"></i> Consultando especificaciones...
+        </div>
+    `;
+    container.appendChild(msgDiv);
+    container.scrollTop = container.scrollHeight;
+    return typingId;
+}
+
+function removeCopilotTyping(typingId) {
+    if (!typingId) return;
+    const el = document.getElementById(typingId);
+    if (el) el.remove();
 }

@@ -78,6 +78,11 @@ class CopilotRequest(BaseModel):
     activeFile: str
     projectData: Dict[str, Any]
 
+class CopilotChatRequest(BaseModel):
+    message: str
+    history: Optional[List[Dict[str, str]]] = []
+    project_data: Dict[str, Any]
+
 class AutocompleteFileRequest(BaseModel):
     project_data: Dict[str, Any]
     filename: str
@@ -1239,6 +1244,66 @@ async def autocomplete_file(req: AutocompleteFileRequest, x_gemini_key: str = He
         }
     except Exception as e:
         logger.error(f"Error autocompletando {filename}: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/copilot-chat")
+async def copilot_chat(req: CopilotChatRequest, x_gemini_key: str = Header(None)):
+    try:
+        model = get_gemini_model(x_gemini_key)
+        pdata = req.project_data or {}
+        proj_name = pdata.get("name", "Proyecto Activo")
+        seed_idea = pdata.get("seedIdea", "")
+        answers = pdata.get("answers", {})
+        spec_modules = pdata.get("specModules", {})
+
+        # Construir contexto completo de especificaciones
+        specs_summary = []
+        for fname, content in spec_modules.items():
+            if content and content.strip():
+                specs_summary.append(f"=== INICIO ARCHIVO SPEC: {fname} ===\n{content.strip()}\n=== FIN ARCHIVO SPEC: {fname} ===")
+
+        if not specs_summary:
+            specs_summary_text = "Aún no hay archivos de especificación (.md) completos. Solo se cuenta con la idea semilla."
+        else:
+            specs_summary_text = "\n\n".join(specs_summary)
+
+        system_instruction = f"""Eres el "Spec Copilot", un Arquitecto de Software y Product Owner experimentado que conversa sobre el proyecto "{proj_name}".
+
+OBJETIVO:
+Tu misión es actuar como el interlocutor principal entre el usuario y las especificaciones técnicas del proyecto. Responde preguntas, aclara dudas, resume decisiones de diseño, explica la arquitectura o sugiere mejoras en lenguaje claro, amigable y estructurado.
+
+INFORMACIÓN DEL PROYECTO:
+- Nombre: {proj_name}
+- Idea General: {seed_idea}
+- Respuestas del Wizard: {json.dumps(answers, ensure_ascii=False)}
+
+DOCUMENTOS DE ESPECIFICACIÓN DISPONIBLES:
+{specs_summary_text}
+
+REGLAS DE RESPUESTA:
+1. Responde de forma clara, directa y estructurada en Markdown (usa títulos breves, viñetas, bloques de código SQL/JSON/JS cuando aporte valor).
+2. Cita siempre el documento de origen cuando menciones detalles específicos (ejemplo: [product.md], [architecture.md], [database.md], etc.).
+3. Si el usuario te pide un resumen alto nivel, sé sintético y resalta el propósito del proyecto, la arquitectura propuesta y la pila tecnológica.
+4. Mantén un tono profesional, servicial y experto.
+"""
+
+        gemini_history = []
+        for msg in (req.history or []):
+            role = "user" if msg.get("role") == "user" else "model"
+            content = msg.get("content", "")
+            if content:
+                gemini_history.append({"role": role, "parts": [content]})
+
+        chat = model.start_chat(history=gemini_history)
+        
+        full_prompt = f"{system_instruction}\n\nPREGUNTA DEL USUARIO:\n{req.message}" if len(gemini_history) == 0 else req.message
+        
+        response = chat.send_message(full_prompt)
+        reply_text = clean_markdown(response.text)
+
+        return {"status": "success", "reply": reply_text}
+    except Exception as e:
+        logger.error(f"Error en copilot-chat: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/open-specs-folder")
