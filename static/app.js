@@ -503,6 +503,7 @@ function setupEventListeners() {
     // Spec Copilot Event Listeners
     const toggleCopilotBtn = document.getElementById('btn-toggle-copilot');
     const closeCopilotBtn = document.getElementById('btn-close-copilot');
+    const expandCopilotBtn = document.getElementById('btn-expand-copilot');
     const clearCopilotBtn = document.getElementById('btn-clear-copilot');
     const sendCopilotBtn = document.getElementById('btn-send-copilot');
     const copilotInput = document.getElementById('copilot-input');
@@ -511,6 +512,18 @@ function setupEventListeners() {
     if (closeCopilotBtn) closeCopilotBtn.addEventListener('click', toggleCopilotPanel);
     if (clearCopilotBtn) clearCopilotBtn.addEventListener('click', clearCopilotChat);
     if (sendCopilotBtn) sendCopilotBtn.addEventListener('click', () => sendCopilotMessage());
+
+    if (expandCopilotBtn) {
+        expandCopilotBtn.addEventListener('click', () => {
+            const panel = document.getElementById('workspace-copilot-panel');
+            if (panel) {
+                panel.classList.toggle('expanded');
+                const isExp = panel.classList.contains('expanded');
+                expandCopilotBtn.innerHTML = isExp ? '<i class="fa-solid fa-compress"></i>' : '<i class="fa-solid fa-expand"></i>';
+                expandCopilotBtn.title = isExp ? 'Restaurar vista lateral del chat' : 'Expandir chat a pantalla completa / modo amplio';
+            }
+        });
+    }
 
     if (copilotInput) {
         copilotInput.addEventListener('keydown', (e) => {

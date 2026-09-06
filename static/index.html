@@ -305,8 +305,8 @@
                                 <i class="fa-regular fa-file-code active-file-icon"></i>
                                 <h2 id="active-spec-title">product.md</h2>
                             </div>
-                            <div class="editor-actions" style="display: flex; gap: 8px;">
-                                <button id="btn-toggle-copilot" class="btn btn-primary btn-sm" style="background: linear-gradient(135deg, var(--primary), var(--accent)); color: white; border: none;" title="Hablar con la IA sobre el proyecto">
+                            <div class="editor-actions" style="display: flex; gap: 8px; align-items: center;">
+                                <button id="btn-toggle-copilot" class="btn btn-primary btn-sm" style="background: linear-gradient(135deg, var(--primary), var(--accent)); color: white; border: none;" title="Abrir/Cerrar Chat Copilot">
                                     <i class="fa-solid fa-comments"></i> Spec Copilot
                                 </button>
                                 <button id="btn-copy-agent-prompt" class="btn btn-border btn-sm" title="Copiar prompt para Open Code / Cursor">
@@ -352,7 +352,8 @@
                                     <span class="copilot-status" style="font-size: 11px; color: var(--text-secondary);"><i class="fa-solid fa-circle" style="font-size: 8px; color: #10b981;"></i> Conectado al proyecto</span>
                                 </div>
                             </div>
-                            <div style="display: flex; gap: 4px;">
+                            <div style="display: flex; gap: 6px; align-items: center;">
+                                <button id="btn-expand-copilot" class="btn-icon" title="Expandir chat a pantalla completa / modo amplio"><i class="fa-solid fa-expand"></i></button>
                                 <button id="btn-clear-copilot" class="btn-icon" title="Limpiar conversación"><i class="fa-solid fa-trash-can"></i></button>
                                 <button id="btn-close-copilot" class="btn-icon" title="Cerrar chat"><i class="fa-solid fa-xmark"></i></button>
                             </div>
