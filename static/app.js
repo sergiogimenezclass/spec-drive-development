@@ -1209,8 +1209,32 @@ function renderOnboardingGrid(filterCategory = 'all') {
 // Parser Markdown utilizando la librería Marked.js para previsualización HTML completa
 function renderMarkdownHTML(md) {
     const pane = document.getElementById('markdown-preview-pane');
-    if (!md) {
-        pane.innerHTML = '<p style="color: var(--text-muted); font-style: italic;">Sin contenido generado aún. Haz clic en "Completar con IA" para redactar esta sección.</p>';
+    if (!md || !md.trim()) {
+        pane.innerHTML = `
+            <div class="empty-spec-state" style="text-align: center; padding: 48px var(--spacing-lg); background: rgba(255,255,255,0.015); border: 1px dashed var(--border-color); border-radius: var(--radius-lg); margin-top: 20px;">
+                <div style="width: 56px; height: 56px; border-radius: 50%; background: linear-gradient(135deg, rgba(123,97,255,0.2), rgba(255,107,157,0.2)); display: flex; align-items: center; justify-content: center; margin: 0 auto 16px auto;">
+                    <i class="fa-solid fa-wand-magic-sparkles" style="font-size: 24px; color: var(--primary);"></i>
+                </div>
+                <h3 style="margin-bottom: 8px; font-weight: 700; color: var(--text-primary);">Especificaciones aún no redactadas</h3>
+                <p style="color: var(--text-secondary); max-width: 520px; margin: 0 auto 20px auto; font-size: 13.5px; line-height: 1.6;">
+                    El proyecto "<strong>${state.currentProject.name || 'Sin título'}</strong>" está configurado. Haz clic en el botón a continuación para que Gemini redacte automáticamente los 17 archivos de especificaciones Markdown en la carpeta de este proyecto.
+                </p>
+                <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+                    <button id="btn-generate-specs-now" class="btn btn-primary" style="background: linear-gradient(135deg, var(--primary), var(--accent)); color: white; border: none; padding: 10px 20px; font-weight: 600;">
+                        <i class="fa-solid fa-play"></i> Redactar Especificaciones con Gemini
+                    </button>
+                    <button id="btn-single-autocomplete" class="btn btn-border" style="padding: 10px 16px;">
+                        <i class="fa-solid fa-file-pen"></i> Redactar solo este archivo (${state.activeSpecFile})
+                    </button>
+                </div>
+            </div>
+        `;
+
+        const genNowBtn = document.getElementById('btn-generate-specs-now');
+        if (genNowBtn) genNowBtn.addEventListener('click', exportSpecsToDisk);
+
+        const singleBtn = document.getElementById('btn-single-autocomplete');
+        if (singleBtn) singleBtn.addEventListener('click', autocompleteActiveSection);
         return;
     }
     
@@ -1350,8 +1374,9 @@ async function exportSpecsToDisk() {
         return;
     }
     
-    showToast("Compilando y exportando directorio /specs...", "info");
+    showToast("Redactando y compilando archivos en /specs...", "info");
     await saveProjectToServer();
+    startPollingGenerationStatus();
     
     try {
         const response = await fetch('/api/export-specs', {
@@ -1363,11 +1388,21 @@ async function exportSpecsToDisk() {
             body: JSON.stringify({ project_data: state.currentProject })
         });
         const data = await response.json();
+        stopPollingGenerationStatus();
+
         if (data.status === 'success') {
-            showToast("Especificación exportada directamente al directorio /specs/ del proyecto", "success");
-            updateGlobalProgressBar();
+            const loadResp = await fetch('/api/load-project');
+            const loadData = await loadResp.json();
+            if (loadData.status === 'success' && loadData.project) {
+                state.currentProject = loadData.project;
+            }
+            showToast("Especificaciones redactadas y guardadas con éxito en la carpeta del proyecto", "success");
+            loadWorkspace();
+        } else {
+            showToast("Hubo un error al generar las especificaciones", "error");
         }
     } catch (e) {
+        stopPollingGenerationStatus();
         console.error(e);
         showToast("Error al exportar especificaciones", "error");
     }
