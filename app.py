@@ -147,6 +147,10 @@ def is_quota_error(err_msg: str) -> bool:
     ]
     return any(ind in msg_lower for ind in quota_indicators)
 
+def _get_fallback_candidates(current_model: str) -> List[str]:
+    all_models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"]
+    return [m for m in all_models if m != current_model]
+
 class GeminiChatSessionWrapper:
     def __init__(self, generative_model, history=None, model_wrapper=None, key_used=None, **kwargs):
         self.chat_session = generative_model.start_chat(history=history or [], **kwargs)
@@ -162,20 +166,23 @@ class GeminiChatSessionWrapper:
             err_msg = str(e)
             err_lower = err_msg.lower()
             
-            # Si el modelo no existe, 404 o no disponible
+            # Si el modelo no existe, 404 o no disponible en la clave
             if "404" in err_lower or "not found" in err_lower or "no longer available" in err_lower or "unsupported" in err_lower:
-                logger.warning(f"Error 404/Modelo no disponible en chat. Intentando reintento de fallback con gemini-1.5-pro o gemini-2.5-flash. Detalle: {err_msg}")
-                try:
-                    fallback_model_name = "gemini-1.5-pro" if (self.model_wrapper and "pro" in getattr(self.model_wrapper, "model_name", "")) else "gemini-2.5-flash"
-                    key_to_use = self.key_used or (self.model_wrapper.primary_key if self.model_wrapper and self.model_wrapper.primary_key else os.environ.get("GEMINI_API_KEY", "")).strip()
-                    if key_to_use:
-                        genai.configure(api_key=key_to_use)
-                        m_fb = genai.GenerativeModel(fallback_model_name)
-                        chat_fb = m_fb.start_chat(history=self.history, **self.kwargs)
-                        return chat_fb.send_message(content, **kwargs)
-                except Exception as fb_e:
-                    logger.error(f"Fallback de chat falló: {fb_e}")
-                    err_msg = str(fb_e)
+                current_m = getattr(self.model_wrapper, 'model_name', 'gemini-1.5-pro')
+                logger.warning(f"Error 404/Modelo no disponible en chat ('{current_m}'). Intentando fallback secuencial de modelos. Detalle: {err_msg}")
+                
+                key_to_use = self.key_used or (self.model_wrapper.primary_key if self.model_wrapper and self.model_wrapper.primary_key else os.environ.get("GEMINI_API_KEY", "")).strip()
+                if key_to_use:
+                    genai.configure(api_key=key_to_use)
+                    for fb_model in _get_fallback_candidates(current_m):
+                        try:
+                            logger.info(f"Reintentando chat con modelo de resguardo '{fb_model}'")
+                            m_fb = genai.GenerativeModel(fb_model)
+                            chat_fb = m_fb.start_chat(history=self.history, **self.kwargs)
+                            return chat_fb.send_message(content, **kwargs)
+                        except Exception as fb_e:
+                            logger.error(f"Fallback de chat con '{fb_model}' falló: {fb_e}")
+                            err_msg = str(fb_e)
 
             if is_quota_error(err_msg):
                 raise HTTPException(
@@ -220,15 +227,15 @@ class GeminiModelWrapper:
                 err_str = str(e).lower()
                 logger.warning(f"Intento {idx + 1} con modelo '{self.model_name}' falló: {e}")
 
-                # Si es error de modelo no encontrado/no soportado, fallback a gemini-1.5-pro o gemini-2.5-flash
+                # Si es error de modelo no encontrado/no soportado, fallback a otros modelos disponibles
                 if ("not found" in err_str or "404" in err_str or "unsupported" in err_str or "no longer available" in err_str):
-                    try:
-                        fallback_model = "gemini-1.5-pro" if "pro" in self.model_name else "gemini-2.5-flash"
-                        logger.info(f"Modelo '{self.model_name}' no disponible, intentando con '{fallback_model}'")
-                        m_fallback = genai.GenerativeModel(fallback_model)
-                        return m_fallback.generate_content(contents, **kwargs)
-                    except Exception as sub_e:
-                        last_error = sub_e
+                    for fb_model in _get_fallback_candidates(self.model_name):
+                        try:
+                            logger.info(f"Modelo '{self.model_name}' no disponible (404), intentando con '{fb_model}'")
+                            m_fallback = genai.GenerativeModel(fb_model)
+                            return m_fallback.generate_content(contents, **kwargs)
+                        except Exception as sub_e:
+                            last_error = sub_e
 
         # Detectar error universal de cuota / rate limit / 429
         err_msg = str(last_error)
@@ -272,13 +279,13 @@ class GeminiModelWrapper:
                 logger.warning(f"start_chat intento {idx + 1} con modelo '{self.model_name}' falló: {e}")
 
                 if ("not found" in err_str or "404" in err_str or "unsupported" in err_str or "no longer available" in err_str):
-                    try:
-                        fallback_model = "gemini-1.5-pro" if "pro" in self.model_name else "gemini-2.5-flash"
-                        logger.info(f"Modelo '{self.model_name}' no soportado en la clave, intentando start_chat con '{fallback_model}'")
-                        m_fallback = genai.GenerativeModel(fallback_model)
-                        return GeminiChatSessionWrapper(m_fallback, history=history, model_wrapper=self, key_used=key, **kwargs)
-                    except Exception as sub_e:
-                        last_error = sub_e
+                    for fb_model in _get_fallback_candidates(self.model_name):
+                        try:
+                            logger.info(f"Modelo '{self.model_name}' no soportado en la clave, intentando start_chat con '{fb_model}'")
+                            m_fallback = genai.GenerativeModel(fb_model)
+                            return GeminiChatSessionWrapper(m_fallback, history=history, model_wrapper=self, key_used=key, **kwargs)
+                        except Exception as sub_e:
+                            last_error = sub_e
 
         err_msg = str(last_error)
         if is_quota_error(err_msg):
