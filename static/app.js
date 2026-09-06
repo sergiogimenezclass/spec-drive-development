@@ -1272,12 +1272,16 @@ function loadWorkspace() {
 
     const hasGeneratedSpecs = state.currentProject && state.currentProject.specModules && Object.keys(state.currentProject.specModules).length > 0 && state.currentProject.specModules['product.md'];
     const exploreBtn = document.getElementById('btn-explore-finish-wizard');
-    if (exploreBtn) {
-        if (hasGeneratedSpecs) {
-            exploreBtn.classList.add('hidden');
-        } else {
-            exploreBtn.classList.remove('hidden');
+    const copilotPanel = document.getElementById('workspace-copilot-panel');
+
+    if (!hasGeneratedSpecs) {
+        if (exploreBtn) exploreBtn.classList.remove('hidden');
+        if (copilotPanel) {
+            copilotPanel.classList.remove('hidden');
+            copilotPanel.classList.add('expanded');
         }
+    } else {
+        if (exploreBtn) exploreBtn.classList.add('hidden');
     }
 }
 
@@ -1443,6 +1447,9 @@ function renderMarkdownHTML(md) {
                     Cuando termines la charla previa, presiona el botón verde a continuación para que la IA pre-llene tu cuestionario y redacte las especificaciones.
                 </p>
                 <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+                    <button id="btn-empty-open-chat" class="btn btn-border" style="padding: 10px 16px;">
+                        <i class="fa-solid fa-comments" style="color: var(--primary);"></i> 💬 Abrir Explore Chat
+                    </button>
                     <button id="btn-empty-review-wizard" class="btn btn-primary" style="background: linear-gradient(135deg, #10b981, #059669); color: white; border: none; padding: 10px 20px; font-weight: 600;">
                         <i class="fa-solid fa-clipboard-check"></i> 📋 Revisar Cuestionario & Redactar Specs
                     </button>
@@ -1452,6 +1459,17 @@ function renderMarkdownHTML(md) {
                 </div>
             </div>
         `;
+
+        const openChatBtn = document.getElementById('btn-empty-open-chat');
+        if (openChatBtn) {
+            openChatBtn.addEventListener('click', () => {
+                const panel = document.getElementById('workspace-copilot-panel');
+                if (panel) {
+                    panel.classList.remove('hidden');
+                    panel.classList.add('expanded');
+                }
+            });
+        }
 
         const reviewBtn = document.getElementById('btn-empty-review-wizard');
         if (reviewBtn) reviewBtn.addEventListener('click', extractAnswersAndLaunchWizard);
