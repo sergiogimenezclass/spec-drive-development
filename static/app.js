@@ -1309,7 +1309,7 @@ function loadWorkspace() {
     saveProjectToServer();
     loadCopilotHistory();
 
-    const hasGeneratedSpecs = state.currentProject && state.currentProject.specModules && Object.keys(state.currentProject.specModules).length > 0 && state.currentProject.specModules['product.md'];
+    const hasGeneratedSpecs = state.currentProject && state.currentProject.specModules && Object.keys(state.currentProject.specModules).length > 0 && (state.currentProject.specModules['product'] || state.currentProject.specModules['product.md']);
     const exploreBtn = document.getElementById('btn-explore-finish-wizard');
     const copilotPanel = document.getElementById('workspace-copilot-panel');
 
