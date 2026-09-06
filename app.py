@@ -148,7 +148,7 @@ def is_quota_error(err_msg: str) -> bool:
     return any(ind in msg_lower for ind in quota_indicators)
 
 def _get_fallback_candidates(current_model: str) -> List[str]:
-    all_models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"]
+    all_models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-flash-latest", "gemini-3.1-pro-preview", "gemini-pro-latest"]
     return [m for m in all_models if m != current_model]
 
 class GeminiChatSessionWrapper:
@@ -165,12 +165,19 @@ class GeminiChatSessionWrapper:
         except Exception as e:
             err_msg = str(e)
             err_lower = err_msg.lower()
-            
-            # Si el modelo no existe, 404 o no disponible en la clave
+
+            # Priorizar detección de cuota (429) antes de cualquier reintento de fallback
+            if is_quota_error(err_msg):
+                raise HTTPException(
+                    status_code=429,
+                    detail=f"⚠️ Límite de Cuota Alcanzado (429/Quota Exceeded): {err_msg}. Ingresa una clave de resguardo o cambia el modelo en la interfaz."
+                )
+
+            # Si el modelo no existe, 404 o no disponible en la clave de la cuenta
             if "404" in err_lower or "not found" in err_lower or "no longer available" in err_lower or "unsupported" in err_lower:
-                current_m = getattr(self.model_wrapper, 'model_name', 'gemini-1.5-pro')
+                current_m = getattr(self.model_wrapper, 'model_name', 'gemini-2.5-flash')
                 logger.warning(f"Error 404/Modelo no disponible en chat ('{current_m}'). Intentando fallback secuencial de modelos. Detalle: {err_msg}")
-                
+
                 key_to_use = self.key_used or (self.model_wrapper.primary_key if self.model_wrapper and self.model_wrapper.primary_key else os.environ.get("GEMINI_API_KEY", "")).strip()
                 if key_to_use:
                     genai.configure(api_key=key_to_use)
@@ -181,14 +188,15 @@ class GeminiChatSessionWrapper:
                             chat_fb = m_fb.start_chat(history=self.history, **self.kwargs)
                             return chat_fb.send_message(content, **kwargs)
                         except Exception as fb_e:
-                            logger.error(f"Fallback de chat con '{fb_model}' falló: {fb_e}")
-                            err_msg = str(fb_e)
+                            fb_err_msg = str(fb_e)
+                            logger.error(f"Fallback de chat con '{fb_model}' falló: {fb_err_msg}")
+                            if is_quota_error(fb_err_msg):
+                                raise HTTPException(
+                                    status_code=429,
+                                    detail=f"⚠️ Límite de Cuota Alcanzado (429/Quota Exceeded): {fb_err_msg}. Ingresa una clave de resguardo o cambia el modelo en la interfaz."
+                                )
+                            err_msg = fb_err_msg
 
-            if is_quota_error(err_msg):
-                raise HTTPException(
-                    status_code=429,
-                    detail=f"⚠️ Límite de Cuota Alcanzado (429/Quota Exceeded): {err_msg}. Ingresa una clave de resguardo o cambia el modelo en la interfaz."
-                )
             if "401" in err_msg or "invalid" in err_msg.lower() or "api_key" in err_msg.lower():
                 raise HTTPException(
                     status_code=401,
@@ -201,8 +209,10 @@ class GeminiModelWrapper:
         self.primary_key = (primary_key or "").strip()
         self.fallback_key = (fallback_key or "").strip()
         m_name = (model_name or "gemini-2.5-flash").strip()
-        if m_name == "gemini-2.5-pro":
-            m_name = "gemini-1.5-pro"
+        if m_name in ["gemini-2.5-pro", "gemini-1.5-pro"]:
+            m_name = "gemini-3.1-pro-preview"
+        elif m_name == "gemini-1.5-flash":
+            m_name = "gemini-2.5-flash"
         self.model_name = m_name
 
     def generate_content(self, contents, **kwargs):
@@ -217,6 +227,9 @@ class GeminiModelWrapper:
             )
 
         last_error = None
+        has_any_quota_err = False
+        quota_err_str = ""
+
         for idx, key in enumerate(keys_to_try):
             try:
                 genai.configure(api_key=key)
@@ -224,27 +237,38 @@ class GeminiModelWrapper:
                 return m.generate_content(contents, **kwargs)
             except Exception as e:
                 last_error = e
-                err_str = str(e).lower()
+                err_str = str(e)
+                err_lower = err_str.lower()
                 logger.warning(f"Intento {idx + 1} con modelo '{self.model_name}' falló: {e}")
 
+                if is_quota_error(err_str):
+                    has_any_quota_err = True
+                    quota_err_str = err_str
+                    continue
+
                 # Si es error de modelo no encontrado/no soportado, fallback a otros modelos disponibles
-                if ("not found" in err_str or "404" in err_str or "unsupported" in err_str or "no longer available" in err_str):
+                if ("not found" in err_lower or "404" in err_lower or "unsupported" in err_lower or "no longer available" in err_lower):
                     for fb_model in _get_fallback_candidates(self.model_name):
                         try:
                             logger.info(f"Modelo '{self.model_name}' no disponible (404), intentando con '{fb_model}'")
                             m_fallback = genai.GenerativeModel(fb_model)
                             return m_fallback.generate_content(contents, **kwargs)
                         except Exception as sub_e:
+                            sub_err_str = str(sub_e)
                             last_error = sub_e
+                            if is_quota_error(sub_err_str):
+                                has_any_quota_err = True
+                                quota_err_str = sub_err_str
 
         # Detectar error universal de cuota / rate limit / 429
         err_msg = str(last_error)
-        if is_quota_error(err_msg):
+        if has_any_quota_err or is_quota_error(err_msg):
+            final_quota_msg = quota_err_str or err_msg
             raise HTTPException(
                 status_code=429,
-                detail=f"⚠️ Límite de Cuota Alcanzado (429/Quota Exceeded): {err_msg}. Ingresa una clave de resguardo o cambia el modelo en la interfaz."
+                detail=f"⚠️ Límite de Cuota Alcanzado (429/Quota Exceeded): {final_quota_msg}. Ingresa una clave de resguardo o cambia el modelo en la interfaz."
             )
-        
+
         if "401" in err_msg or "invalid" in err_msg.lower() or "api_key" in err_msg.lower():
             raise HTTPException(
                 status_code=401,
@@ -268,6 +292,9 @@ class GeminiModelWrapper:
             )
 
         last_error = None
+        has_any_quota_err = False
+        quota_err_str = ""
+
         for idx, key in enumerate(keys_to_try):
             try:
                 genai.configure(api_key=key)
@@ -275,23 +302,34 @@ class GeminiModelWrapper:
                 return GeminiChatSessionWrapper(m, history=history, model_wrapper=self, key_used=key, **kwargs)
             except Exception as e:
                 last_error = e
-                err_str = str(e).lower()
+                err_str = str(e)
+                err_lower = err_str.lower()
                 logger.warning(f"start_chat intento {idx + 1} con modelo '{self.model_name}' falló: {e}")
 
-                if ("not found" in err_str or "404" in err_str or "unsupported" in err_str or "no longer available" in err_str):
+                if is_quota_error(err_str):
+                    has_any_quota_err = True
+                    quota_err_str = err_str
+                    continue
+
+                if ("not found" in err_lower or "404" in err_lower or "unsupported" in err_lower or "no longer available" in err_lower):
                     for fb_model in _get_fallback_candidates(self.model_name):
                         try:
                             logger.info(f"Modelo '{self.model_name}' no soportado en la clave, intentando start_chat con '{fb_model}'")
                             m_fallback = genai.GenerativeModel(fb_model)
                             return GeminiChatSessionWrapper(m_fallback, history=history, model_wrapper=self, key_used=key, **kwargs)
                         except Exception as sub_e:
+                            sub_err_str = str(sub_e)
                             last_error = sub_e
+                            if is_quota_error(sub_err_str):
+                                has_any_quota_err = True
+                                quota_err_str = sub_err_str
 
         err_msg = str(last_error)
-        if is_quota_error(err_msg):
+        if has_any_quota_err or is_quota_error(err_msg):
+            final_quota_msg = quota_err_str or err_msg
             raise HTTPException(
                 status_code=429,
-                detail=f"⚠️ Límite de Cuota Alcanzado (429/Quota Exceeded): {err_msg}. Ingresa una clave de resguardo o cambia el modelo en la interfaz."
+                detail=f"⚠️ Límite de Cuota Alcanzado (429/Quota Exceeded): {final_quota_msg}. Ingresa una clave de resguardo o cambia el modelo en la interfaz."
             )
 
         if "401" in err_msg or "invalid" in err_msg.lower() or "api_key" in err_msg.lower():
@@ -339,17 +377,19 @@ async def get_config():
     has_key = bool(os.environ.get("GEMINI_API_KEY"))
     has_fallback = bool(os.environ.get("GEMINI_FALLBACK_API_KEY"))
     current_model = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
-    if current_model == "gemini-2.5-pro":
-        current_model = "gemini-1.5-pro"
+    if current_model in ["gemini-2.5-pro", "gemini-1.5-pro"]:
+        current_model = "gemini-3.1-pro-preview"
+    elif current_model == "gemini-1.5-flash":
+        current_model = "gemini-2.5-flash"
     return {
         "hasApiKey": has_key,
         "hasFallbackKey": has_fallback,
         "currentModel": current_model,
         "availableModels": [
-            {"id": "gemini-1.5-pro", "name": "🧠 Gemini 1.5 Pro (Máxima Potencia)", "badge": "Pro"},
+            {"id": "gemini-3.1-pro-preview", "name": "🧠 Gemini 3.1 Pro (Máxima Potencia)", "badge": "Pro"},
             {"id": "gemini-2.5-flash", "name": "⚡ Gemini 2.5 Flash (Ultra Rápido - Recomendado)", "badge": "Flash"},
             {"id": "gemini-2.0-flash", "name": "⚡ Gemini 2.0 Flash (Alta Disponibilidad)", "badge": "Flash"},
-            {"id": "gemini-1.5-flash", "name": "⚡ Gemini 1.5 Flash (Estándar)", "badge": "Flash"}
+            {"id": "gemini-flash-latest", "name": "⚡ Gemini Flash (Última Versión)", "badge": "Flash"}
         ]
     }
 

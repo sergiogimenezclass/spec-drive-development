@@ -276,7 +276,8 @@ function loadSettings() {
     state.apiKey = localStorage.getItem('gemini_api_key') || '';
     state.fallbackApiKey = localStorage.getItem('gemini_fallback_key') || '';
     let savedModel = localStorage.getItem('gemini_model') || 'gemini-2.5-flash';
-    if (savedModel === 'gemini-2.5-pro') savedModel = 'gemini-1.5-pro';
+    if (savedModel === 'gemini-2.5-pro' || savedModel === 'gemini-1.5-pro') savedModel = 'gemini-3.1-pro-preview';
+    if (savedModel === 'gemini-1.5-flash') savedModel = 'gemini-2.5-flash';
     state.selectedModel = savedModel;
     
     const keyInput = document.getElementById('gemini-api-key');
