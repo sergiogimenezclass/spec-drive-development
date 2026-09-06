@@ -1,0 +1,9 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "El Teclado Micr\u00f3fono Transcripciones API",
+    "version": "1.0.0",
+    "description": "Especificaci\u00f3n de API para Aplicaci\u00f3n de dictado de voz y transcripciones autom\u00e1ticas utilizando un teclado virtual y micr\u00f3fono integrado (Turbo Whisper). Permite a los usuarios hablar y transcribir texto en tiempo real a cualquier aplicaci\u00f3n, gestionar atajos de teclado, historial de transcripciones y proveedores de IA configurables."
+  },
+  "paths": {}
+}
