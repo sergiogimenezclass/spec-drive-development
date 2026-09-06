@@ -56,6 +56,12 @@
             </div>
 
             <div class="header-right">
+                <!-- Botón de Guía / Onboarding -->
+                <button id="btn-open-onboarding" class="btn btn-border btn-sm" style="display: flex; align-items: center; gap: 6px;" title="Abrir Guía de Especificaciones y Onboarding">
+                    <i class="fa-solid fa-book-bookmark" style="color: var(--accent);"></i>
+                    <span>Guía de Specs</span>
+                </button>
+
                 <!-- Clave API de Gemini -->
                 <div class="api-key-input-wrapper">
                     <i class="fa-solid fa-key key-icon"></i>
@@ -309,6 +315,20 @@
                             </div>
                         </div>
 
+                        <!-- BANNER CONTEXTUAL DE INFORMACIÓN DEL MÓDULO -->
+                        <div id="spec-info-banner" class="spec-info-banner">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <i class="fa-solid fa-circle-info" style="color: var(--accent); font-size: 16px;"></i>
+                                <div>
+                                    <span id="banner-category-badge" class="badge" style="margin-right: 6px;">Visión & Producto</span>
+                                    <strong id="banner-doc-title">product.md</strong> — <span id="banner-doc-desc" style="color: var(--text-secondary);">Visión estratégica del producto, propuesta de valor y reglas de negocio inquebrantables.</span>
+                                </div>
+                            </div>
+                            <button id="btn-banner-more-info" class="btn btn-border btn-sm" style="font-size: 11px; padding: 4px 8px; white-space: nowrap;">
+                                <i class="fa-solid fa-book-bookmark"></i> Ver en Guía
+                            </button>
+                        </div>
+
                         <div class="editor-workspace">
                             <!-- VISTA DE PREVISUALIZACIÓN -->
                             <div class="markdown-preview-pane" id="markdown-preview-pane" style="flex: 1; min-height: 0;">
@@ -387,9 +407,51 @@
         </div>
     </div>
 
+    <!-- MODAL DE ONBOARDING Y GUÍA DE ESPECIFICACIONES -->
+    <div id="onboarding-modal" class="modal-overlay hidden" style="z-index: 1000;">
+        <div class="modal-card" style="max-width: 960px; width: 94vw; max-height: 88vh; display: flex; flex-direction: column;">
+            <div class="modal-header" style="display: flex; align-items: center; justify-content: space-between; padding: 20px 24px; border-bottom: var(--glass-border);">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <i class="fa-solid fa-book-bookmark" style="font-size: 24px; color: var(--accent);"></i>
+                    <div>
+                        <h2 style="font-family: var(--font-title); font-size: 20px; font-weight: 700; margin: 0;">Guía de Especificaciones & Metodología Spec-First</h2>
+                        <p style="font-size: 12px; color: var(--text-secondary); margin: 2px 0 0 0;">Conoce para qué sirve cada uno de los 17 módulos y cómo alimentan a tus agentes de código de IA.</p>
+                    </div>
+                </div>
+                <button id="btn-close-onboarding-modal" class="btn-back" style="font-size: 18px; color: var(--text-muted); cursor: pointer;"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            
+            <div class="modal-body" style="padding: 24px; overflow-y: auto; flex: 1;">
+                <!-- Pestañas de categorías -->
+                <div class="onboarding-tabs" style="display: flex; gap: 8px; border-bottom: 1px solid var(--border-color); margin-bottom: 20px; padding-bottom: 12px; overflow-x: auto;">
+                    <button class="btn btn-sm btn-border onboarding-tab-btn active" data-tab="all">
+                        <i class="fa-solid fa-layer-group"></i> Todos los Módulos (17)
+                    </button>
+                    <button class="btn btn-sm btn-border onboarding-tab-btn" data-tab="vision">
+                        <i class="fa-solid fa-lightbulb"></i> Visión & Producto
+                    </button>
+                    <button class="btn btn-sm btn-border onboarding-tab-btn" data-tab="architecture">
+                        <i class="fa-solid fa-sitemap"></i> Arquitectura & Datos
+                    </button>
+                    <button class="btn btn-sm btn-border onboarding-tab-btn" data-tab="ui">
+                        <i class="fa-solid fa-window-maximize"></i> UI & Lógica
+                    </button>
+                    <button class="btn btn-sm btn-border onboarding-tab-btn" data-tab="management">
+                        <i class="fa-solid fa-map-location-dot"></i> Gestión & Entrega
+                    </button>
+                </div>
+
+                <!-- Grid de tarjetas de módulos -->
+                <div class="onboarding-grid" id="onboarding-grid-container">
+                    <!-- Inyectado dinámicamente desde app.js -->
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Notificaciones flotantes -->
     <div id="toast-container" class="toast-container"></div>
 
-    <script src="app.js?v=2.2.4"></script>
+    <script src="app.js?v=2.3.0"></script>
 </body>
 </html>

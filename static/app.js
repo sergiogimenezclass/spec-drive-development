@@ -49,6 +49,163 @@ const SPEC_FILES = [
     { name: 'agents.md', label: 'Instrucciones IA', icon: 'fa-robot', status: 'completed' }
 ];
 
+// Documentación detallada de los 17 archivos de especificación para el Onboarding
+const SPEC_DOCS = {
+    'project.md': {
+        title: 'Ficha Técnica del Proyecto',
+        category: 'vision',
+        categoryLabel: 'Visión & Producto',
+        icon: 'fa-file-signature',
+        desc: 'Ficha ejecutiva con la idea inicial, resumen conceptual y metadatos generales del proyecto.',
+        details: 'Define la semilla del proyecto, su dominio de industria, tipo de producto (SaaS, Mobile, Web), lista de actores detectados e información general del negocio.',
+        consumer: 'Humano / IA'
+    },
+    'product.md': {
+        title: 'Producto & Valor',
+        category: 'vision',
+        categoryLabel: 'Visión & Producto',
+        icon: 'fa-lightbulb',
+        desc: 'Visión estratégica del producto, propuesta de valor, usuarios/actores y reglas de negocio inquebrantables.',
+        details: 'Establece los objetivos de negocio, las métricas de éxito, la descripción de roles de usuario y las reglas lógicas críticas que el código NUNCA puede violar.',
+        consumer: 'Agente IA (Dev Prompt & SSOT)'
+    },
+    'requirements.md': {
+        title: 'Requisitos Funcionales y RNF',
+        category: 'vision',
+        categoryLabel: 'Visión & Producto',
+        icon: 'fa-list-check',
+        desc: 'Requisitos funcionales (RF) de dominio y requisitos no funcionales (RNF: rendimiento, latencia, seguridad).',
+        details: 'Lista numerada de comportamientos esperados del sistema (RF-01, RF-02...) y restricciones técnicas de calidad (RNF-01, RNF-02...).',
+        consumer: 'Agente IA / Desarrollador'
+    },
+    'user-stories.md': {
+        title: 'Historias de Usuario & Criterios BDD',
+        category: 'vision',
+        categoryLabel: 'Visión & Producto',
+        icon: 'fa-book-open-reader',
+        desc: 'Historias de usuario con criterios de aceptación ejecutables en formato Given/When/Then.',
+        details: 'Historias de usuario en formato estándar (Como X, quiero Y, para Z) acompañadas de escenarios de prueba BDD para testing automatizado.',
+        consumer: 'Agente IA (TDD / BDD Testing)'
+    },
+    'architecture.md': {
+        title: 'Arquitectura del Sistema',
+        category: 'architecture',
+        categoryLabel: 'Arquitectura & Datos',
+        icon: 'fa-sitemap',
+        desc: 'Pila tecnológica propuesta, estructura modular, patrones de diseño y flujo de datos del sistema.',
+        details: 'Justificación del tech stack (Frontend, Backend, DB), estructura de directorios recomendada, componentes principales y diagrama de flujo Mermaid.',
+        consumer: 'Agente IA (Software Architect)'
+    },
+    'database.md': {
+        title: 'Modelo de Datos & Prisma DSL',
+        category: 'architecture',
+        categoryLabel: 'Arquitectura & Datos',
+        icon: 'fa-database',
+        desc: 'Modelo conceptual de entidades, relaciones y el esquema físico completo en sintaxis Prisma DSL / SQL.',
+        details: 'Contiene el diagrama ER Mermaid, definición de entidades/atributos y el código schema.prisma completo listo para copiar o migrar.',
+        consumer: 'Agente IA (Database Engine)'
+    },
+    'api.md': {
+        title: 'Contrato de API (MD)',
+        category: 'architecture',
+        categoryLabel: 'Arquitectura & Datos',
+        icon: 'fa-gears',
+        desc: 'Especificación humana y legible de los endpoints RESTful, rutas, verbos HTTP, payloads y respuestas.',
+        details: 'Detalla cada ruta de la API (GET /api/v1/..., POST ...), parámetros requeridos, códigos de respuesta HTTP y contratos JSON de entrada y salida.',
+        consumer: 'Humano / Agente IA'
+    },
+    'openapi.json': {
+        title: 'OpenAPI 3.0 Spec (JSON)',
+        category: 'architecture',
+        categoryLabel: 'Arquitectura & Datos',
+        icon: 'fa-code',
+        desc: 'Especificación estándar OpenAPI 3.0 en formato JSON estricto para autogenerar clientes, mocks y controladores.',
+        details: 'Documento JSON estricto compatible con Swagger, Postman, OpenAPI Generator y herramientas de integración de código automatizado.',
+        consumer: 'Swagger / Postman / Codegen'
+    },
+    'frontend.md': {
+        title: 'Especificación UI / UX',
+        category: 'ui',
+        categoryLabel: 'UI & Lógica',
+        icon: 'fa-window-maximize',
+        desc: 'Diseño de pantallas, flujo de navegación, componentes UI, estados visuales y guía de estilos.',
+        details: 'Fichas de cada pantalla de la app, layout responsive, sistema de componentes reutilizables, paleta de colores HSL y comportamientos visuales.',
+        consumer: 'Agente IA (Frontend Dev)'
+    },
+    'backend.md': {
+        title: 'Lógica Backend & Servicios',
+        category: 'ui',
+        categoryLabel: 'UI & Lógica',
+        icon: 'fa-server',
+        desc: 'Arquitectura de controladores, capas de servicio, casos de uso, middlewares y validaciones del servidor.',
+        details: 'Define la separación en capas (Controller -> Service -> Repository), manejo centralizado de excepciones y reglas de negocio del servidor.',
+        consumer: 'Agente IA (Backend Dev)'
+    },
+    'security.md': {
+        title: 'Seguridad, Roles & Permisos',
+        category: 'ui',
+        categoryLabel: 'UI & Lógica',
+        icon: 'fa-user-shield',
+        desc: 'Políticas de autenticación (JWT/OAuth), matriz de RBAC (roles y permisos), cifrado y saneamiento.',
+        details: 'Detalla cómo se protegen las rutas de la aplicación, manejo de tokens JWT/Cookies HTTP-only, matriz de permisos por rol y saneamiento de entradas.',
+        consumer: 'Agente IA (Security Engine)'
+    },
+    'integrations.md': {
+        title: 'Integraciones Externas',
+        category: 'ui',
+        categoryLabel: 'UI & Lógica',
+        icon: 'fa-puzzle-piece',
+        desc: 'Configuración de servicios de terceros (Mercado Pago, pasarelas, emails, webhooks, APIs externas).',
+        details: 'Especifica la integración con SDKs externos, manejo de webhooks entrantes, flujo de pagos, credenciales de entorno y resiliencia.',
+        consumer: 'Agente IA (Integraciones)'
+    },
+    'roadmap.md': {
+        title: 'Roadmap & Alcance MVP',
+        category: 'management',
+        categoryLabel: 'Gestión & Entrega',
+        icon: 'fa-map-location-dot',
+        desc: 'Planificación de releases por fases (MVP, Fase 2, Mejoras futuras) marcando el alcance prioritario.',
+        details: 'Matriz de priorización MoSCoW (Must, Should, Could, Won\'t) clasificando qué funcionalidades entran en la versión 1.0 vs fases posteriores.',
+        consumer: 'Product Manager / Humano'
+    },
+    'tasks.md': {
+        title: 'Lista de Tareas de Código',
+        category: 'management',
+        categoryLabel: 'Gestión & Entrega',
+        icon: 'fa-clipboard-list',
+        desc: 'Lista ordenada de tareas técnicas de codificación ejecutables paso a paso por la IA.',
+        details: 'Lista de verificación en formato Markdown ([ ] / [x]) dividida por módulos (Setup, Database, Backend, Frontend) para guiar la construcción.',
+        consumer: 'Agente IA (Task Execution)'
+    },
+    'decisions.md': {
+        title: 'Registro de Decisiones (ADR)',
+        category: 'management',
+        categoryLabel: 'Gestión & Entrega',
+        icon: 'fa-gavel',
+        desc: 'Registro de Decisiones de Arquitectura (ADR) con el contexto y justificación de cada elección técnica.',
+        details: 'Documentos ADR (Architecture Decision Records) estructurados con Estado, Contexto, Decisión y Consecuencias para mantener coherencia.',
+        consumer: 'Humano / Agente IA'
+    },
+    'glossary.md': {
+        title: 'Glosario & Nomenclatura',
+        category: 'management',
+        categoryLabel: 'Gestión & Entrega',
+        icon: 'fa-spell-check',
+        desc: 'Glosario del dominio y mapeo de nombres Español ↔ Inglés para código y base de datos.',
+        details: 'Tabla de traducción de conceptos de negocio a identificadores técnicos sugeridos en inglés (ej: Turno -> Appointment, Profesional -> Specialist).',
+        consumer: 'Agente IA (Nomenclatura)'
+    },
+    'agents.md': {
+        title: 'Prompt Maestro e Instrucciones IA',
+        category: 'management',
+        categoryLabel: 'Instrucciones IA',
+        icon: 'fa-robot',
+        desc: 'Archivo de instrucciones primarias para OpenCode, Cursor o Cline con reglas de estilo y referencia SSOT.',
+        details: 'Instrucciones ejecutivas directas que debes copiar/pegar o adjuntar al iniciar tu asistente de código (Cursor, OpenCode, Cline) para que siga la spec.',
+        consumer: 'Agente IA (Prompt Inicial)'
+    }
+};
+
 // Document Ready
 document.addEventListener('DOMContentLoaded', () => {
     initApp();
@@ -269,6 +426,44 @@ function setupEventListeners() {
 
     // Exportar Specs
     document.getElementById('btn-export-specs').addEventListener('click', exportSpecsToDisk);
+
+    // Modal de Onboarding / Guía de Specs
+    const onboardingModal = document.getElementById('onboarding-modal');
+    const openOnboardingBtn = document.getElementById('btn-open-onboarding');
+    const bannerMoreInfoBtn = document.getElementById('btn-banner-more-info');
+    const closeOnboardingBtn = document.getElementById('btn-close-onboarding-modal');
+
+    const openOnboardingHandler = () => {
+        renderOnboardingGrid('all');
+        if (onboardingModal) onboardingModal.classList.remove('hidden');
+    };
+
+    if (openOnboardingBtn) openOnboardingBtn.addEventListener('click', openOnboardingHandler);
+    if (bannerMoreInfoBtn) bannerMoreInfoBtn.addEventListener('click', openOnboardingHandler);
+    if (closeOnboardingBtn) {
+        closeOnboardingBtn.addEventListener('click', () => {
+            if (onboardingModal) onboardingModal.classList.add('hidden');
+        });
+    }
+
+    if (onboardingModal) {
+        onboardingModal.addEventListener('click', (e) => {
+            if (e.target === onboardingModal) {
+                onboardingModal.classList.add('hidden');
+            }
+        });
+    }
+
+    // Pestañas de categorías del Onboarding
+    const tabBtns = document.querySelectorAll('.onboarding-tab-btn');
+    tabBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            tabBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            const category = btn.dataset.tab;
+            renderOnboardingGrid(category);
+        });
+    });
 
     // Modal de Planificación de Features
     const planningModal = document.getElementById('planning-modal');
@@ -874,10 +1069,72 @@ function selectSpecFile(filename) {
     // Cambiar clase activa en el árbol
     renderSpecTree();
     
+    // Actualizar el banner informativo del editor
+    updateSpecInfoBanner(filename);
+
     // Cargar contenido Markdown y renderizarlo
     const moduleName = filename.replace('.md', '').replace('.json', '');
     const mdContent = (state.currentProject.specModules && state.currentProject.specModules[moduleName]) || '';
     renderMarkdownHTML(mdContent);
+}
+
+// Actualizar información del banner contextual en el editor
+function updateSpecInfoBanner(filename) {
+    const doc = SPEC_DOCS[filename];
+    if (!doc) return;
+    
+    const catBadge = document.getElementById('banner-category-badge');
+    const docTitle = document.getElementById('banner-doc-title');
+    const docDesc = document.getElementById('banner-doc-desc');
+    
+    if (catBadge) catBadge.innerText = doc.categoryLabel;
+    if (docTitle) docTitle.innerText = filename;
+    if (docDesc) docDesc.innerText = doc.desc;
+}
+
+// Renderizar la cuadrícula de tarjetas de especificaciones en el Onboarding Modal
+function renderOnboardingGrid(filterCategory = 'all') {
+    const container = document.getElementById('onboarding-grid-container');
+    if (!container) return;
+
+    container.innerHTML = '';
+
+    Object.keys(SPEC_DOCS).forEach(fname => {
+        const doc = SPEC_DOCS[fname];
+        if (filterCategory !== 'all' && doc.category !== filterCategory) return;
+
+        const card = document.createElement('div');
+        card.className = 'onboarding-card';
+        card.innerHTML = `
+            <div class="onboarding-card-header">
+                <div class="onboarding-card-title">
+                    <i class="fa-solid ${doc.icon}"></i>
+                    <span>${fname}</span>
+                </div>
+                <span class="badge">${doc.categoryLabel}</span>
+            </div>
+            <div style="font-weight: 600; font-size: 13px; color: var(--text-primary); margin-top: 2px;">${doc.title}</div>
+            <p class="onboarding-card-desc">${doc.desc}</p>
+            <div style="font-size: 12px; color: var(--text-secondary); background: rgba(255,255,255,0.02); padding: 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.04);">
+                <strong>Contenido & Función:</strong> ${doc.details}
+            </div>
+            <div class="onboarding-card-footer">
+                <span><i class="fa-solid fa-microchip"></i> Consumidor: <strong>${doc.consumer}</strong></span>
+                <button class="btn btn-border btn-sm open-spec-btn" data-file="${fname}" style="font-size: 11px; padding: 2px 8px;">
+                    Ver Módulo <i class="fa-solid fa-arrow-right"></i>
+                </button>
+            </div>
+        `;
+
+        card.querySelector('.open-spec-btn').addEventListener('click', () => {
+            const onboardingModal = document.getElementById('onboarding-modal');
+            if (onboardingModal) onboardingModal.classList.add('hidden');
+            loadWorkspace();
+            selectSpecFile(fname);
+        });
+
+        container.appendChild(card);
+    });
 }
 
 // Parser Markdown utilizando la librería Marked.js para previsualización HTML completa
