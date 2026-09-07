@@ -954,14 +954,34 @@ def parse_feature_metadata_from_file(filepath: str, folder: str, feat_id: str) -
 
 @app.get("/api/load-project")
 async def load_project():
-    project_file = get_project_file()
-    specs_dir = get_specs_dir()
-    if not os.path.exists(project_file):
-        return {"status": "empty", "project": None}
     try:
-        with open(project_file, "r", encoding="utf-8") as f:
-            project_data = json.load(f)
-            
+        project_file = get_project_file()
+        specs_dir = get_specs_dir()
+        
+        project_data = None
+        if os.path.exists(project_file):
+            try:
+                with open(project_file, "r", encoding="utf-8") as f:
+                    project_data = json.load(f)
+            except Exception as e:
+                logger.error(f"Error leyendo project.json: {str(e)}")
+
+        if not project_data:
+            if os.path.exists(specs_dir):
+                folder_name = os.path.basename(get_target_project_path())
+                project_data = {
+                    "id": "proj_" + str(int(os.path.getmtime(specs_dir))),
+                    "name": folder_name.replace("-", " ").replace("_", " ").title(),
+                    "seedIdea": f"Proyecto {folder_name}",
+                    "createdAt": int(os.path.getmtime(specs_dir) * 1000),
+                    "updatedAt": int(os.path.getmtime(specs_dir) * 1000),
+                    "answers": {},
+                    "specModules": {},
+                    "featuresList": []
+                }
+            else:
+                return {"status": "empty", "project": None}
+
         disk_features = []
         disk_modules = {}
             

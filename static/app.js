@@ -334,8 +334,8 @@ async function checkProjectPath() {
         const data = await response.json();
         if (data.status === 'success' && data.project_path) {
             const input = document.getElementById('project-target-path-input');
-            if (input && !input.value) {
-                input.value = data.project_path;
+            if (input) {
+                input.placeholder = `Dejar vacío para ./projects/<nombre> (Carpeta activa: ${data.project_path})`;
             }
         }
     } catch (e) {
