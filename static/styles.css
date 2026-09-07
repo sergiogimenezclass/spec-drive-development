@@ -1946,13 +1946,13 @@ body {
 
 .copilot-input-wrapper {
     display: flex;
-    align-items: center;
+    align-items: flex-end;
     gap: 8px;
     background: var(--bg-surface-solid);
     border: 1px solid var(--border-color);
-    border-radius: 20px;
-    padding: 6px 12px;
-    transition: border-color 0.2s;
+    border-radius: 14px;
+    padding: 8px 12px;
+    transition: border-color 0.2s, border-radius 0.2s;
 }
 
 .copilot-input-wrapper:focus-within {
@@ -1966,10 +1966,22 @@ body {
     border: none;
     outline: none;
     color: var(--text-primary);
-    font-size: 13px;
+    font-size: 13.5px;
+    line-height: 1.45;
     resize: none;
-    max-height: 80px;
+    min-height: 24px;
+    max-height: 140px;
+    padding: 3px 0;
     font-family: inherit;
+    overflow-y: auto;
+}
+
+.copilot-input-wrapper textarea::-webkit-scrollbar {
+    width: 5px;
+}
+.copilot-input-wrapper textarea::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
 }
 
 .copilot-input-wrapper .btn-send {
