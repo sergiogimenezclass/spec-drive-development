@@ -1992,3 +1992,18 @@ body {
     background: var(--accent);
     transform: scale(1.05);
 }
+
+/* Estilos legibles y estables para selectores de modelos */
+.model-select-wrapper select, select#quota-model-select {
+    color: var(--text-primary) !important;
+    background-color: var(--bg-surface-solid) !important;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    font-weight: 600;
+}
+
+select option {
+    background-color: #1e293b !important;
+    color: #f8fafc !important;
+    padding: 8px 12px;
+}
