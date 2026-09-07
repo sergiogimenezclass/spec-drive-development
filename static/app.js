@@ -416,6 +416,10 @@ async function checkExistingProject() {
 
         if (activeData.status === 'success' && activeData.project) {
             state.currentProject = activeData.project;
+            const hasSpecs = state.currentProject.specModules && Object.keys(state.currentProject.specModules).length > 0;
+            if (hasSpecs && !window.location.hash.includes('dashboard')) {
+                loadWorkspace();
+            }
         }
 
         const projectsList = (recentData.status === 'success' && recentData.projects) ? recentData.projects : [];
@@ -450,20 +454,26 @@ function renderRecentProjectsList(projects) {
             minute: '2-digit'
         });
         const activeBadge = proj.isActive 
-            ? `<span class="badge" style="background: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.4); font-size: 10px; padding: 2px 6px;">Activo</span>`
+            ? `<span class="badge" style="background: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.4); font-size: 10px; padding: 2px 6px;">En Uso</span>`
             : '';
+        const ideaShort = proj.seedIdea ? (proj.seedIdea.length > 85 ? proj.seedIdea.substring(0, 82) + '...' : proj.seedIdea) : '';
 
         return `
-            <div class="recent-project-item ${proj.isActive ? 'active-project-card' : ''}" data-path="${proj.path}">
-                <div class="project-item-info">
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <span class="project-item-title">${proj.name}</span>
+            <div class="recent-project-item ${proj.isActive ? 'active-project-card' : ''}" data-path="${proj.path}" style="margin-bottom: 10px; padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer;">
+                <div class="project-item-info" style="flex: 1; min-width: 0;">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 3px;">
+                        <span class="project-item-title" style="font-weight: 700; font-size: 15px; color: var(--text-primary);">${proj.name}</span>
                         ${activeBadge}
                     </div>
-                    <span class="project-item-date">Modificado: ${dateStr} &bull; <span style="font-family: monospace; font-size: 10px; color: var(--text-muted);">${proj.path}</span></span>
+                    ${ideaShort ? `<div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${ideaShort}</div>` : ''}
+                    <div style="font-size: 11px; color: var(--text-muted); font-family: monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                        <i class="fa-solid fa-folder-closed" style="margin-right: 4px;"></i>${proj.path}
+                    </div>
                 </div>
                 <div class="project-item-action">
-                    <i class="fa-solid fa-chevron-right"></i>
+                    <button type="button" class="btn btn-sm ${proj.isActive ? 'btn-primary' : 'btn-border'}" style="pointer-events: none; white-space: nowrap; font-size: 12px; font-weight: 600;">
+                        ${proj.isActive ? '<i class="fa-solid fa-folder-open"></i> En uso' : '<i class="fa-solid fa-arrow-right"></i> Abrir'}
+                    </button>
                 </div>
             </div>
         `;

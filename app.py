@@ -601,6 +601,18 @@ async def get_recent_projects():
                 if full_item_path not in registered_paths:
                     registered_paths.append(full_item_path)
 
+    # Escanear directorio padre para detectar otros proyectos creados en el entorno
+    parent_dir = os.path.dirname(ROOT_APP_DIR)
+    if os.path.exists(parent_dir):
+        try:
+            for item in os.listdir(parent_dir):
+                full_item_path = os.path.join(parent_dir, item)
+                if os.path.isdir(full_item_path):
+                    if full_item_path not in registered_paths:
+                        registered_paths.append(full_item_path)
+        except Exception as e:
+            logger.error(f"Error escaneando directorio padre: {str(e)}")
+
     # Incluir la carpeta raíz si tiene project.json
     if ROOT_APP_DIR not in registered_paths:
         registered_paths.append(ROOT_APP_DIR)
