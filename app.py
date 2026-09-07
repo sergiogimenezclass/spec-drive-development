@@ -1920,8 +1920,21 @@ REGLAS DE RESPUESTA:
      <!-- GENERATE_FEATURE: {{"name": "Nombre de la Feature", "folder": "nombre-carpeta", "description": "Breve descripcion de la feature"}} -->
 """
 
+            # Cargar historial existente en disco para no sobreescribir mensajes previos si el cliente rellenó history con []
+            history_file = os.path.join(get_target_project_path(), "chat_history.json")
+            disk_history = []
+            if os.path.exists(history_file):
+                try:
+                    with open(history_file, "r", encoding="utf-8") as f:
+                        disk_history = json.load(f)
+                except Exception as e:
+                    logger.error(f"Error leyendo chat_history.json en disco: {str(e)}")
+
+            client_history = req.history or []
+            base_history = client_history if (len(client_history) >= len(disk_history)) else disk_history
+
             gemini_history = []
-            for msg in (req.history or []):
+            for msg in base_history:
                 role = "user" if msg.get("role") == "user" else "model"
                 content = msg.get("content", "")
                 if content:
@@ -1969,12 +1982,11 @@ REGLAS DE RESPUESTA:
                     yield f"data: {data_json}\n\n"
 
             # Guardar historial actualizado en el disco del proyecto
-            updated_history = (req.history or []) + [
+            updated_history = base_history + [
                 {"role": "user", "content": req.message},
                 {"role": "model", "content": reply_text}
             ]
             try:
-                history_file = os.path.join(get_target_project_path(), "chat_history.json")
                 with open(history_file, "w", encoding="utf-8") as f:
                     json.dump(updated_history, f, ensure_ascii=False, indent=2)
             except Exception as e:
