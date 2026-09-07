@@ -477,7 +477,11 @@
                             <i class="fa-solid fa-circle-plus"></i> + Agregar Feature Manual Personalizada
                         </div>
                         <div id="form-add-custom-feature" class="hidden" style="margin-top: 10px; display: flex; flex-direction: column; gap: 8px;">
-                            <input type="text" id="custom-feature-name-input" placeholder="Nombre de la Feature (ej: Exportar catálogo a PDF)" style="width: 100%; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-surface-hover); color: var(--text-primary); font-size: 13px; outline: none;">
+                            <input type="text" id="custom-feature-name-input" placeholder="Nombre de la sub-feature (ej: Notificaciones por Email)" style="width: 100%; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-surface-hover); color: var(--text-primary); font-size: 13px; outline: none;">
+                            <div style="display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text-secondary);">
+                                <span>Carpeta del módulo:</span>
+                                <input type="text" id="custom-feature-folder-input" placeholder="ej: calendario" style="flex: 1; padding: 4px 10px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-surface-solid); color: var(--text-primary); font-size: 12px; outline: none; font-family: monospace;">
+                            </div>
                             <textarea id="custom-feature-desc-input" placeholder="Breve descripción o reglas de negocio principales (opcional)..." style="width: 100%; min-height: 50px; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-surface-hover); color: var(--text-primary); font-size: 12px; resize: vertical; outline: none;"></textarea>
                             <div style="display: flex; gap: 8px; justify-content: flex-end;">
                                 <button type="button" id="btn-cancel-custom-feature" class="btn btn-border btn-sm" style="font-size: 11px;">Cancelar</button>

@@ -788,19 +788,51 @@ function setupEventListeners() {
     document.getElementById('btn-start-planning-analysis').addEventListener('click', runPlanningAnalysis);
     document.getElementById('btn-submit-generation').addEventListener('click', submitFeatureGeneration);
 
+    // Helper para slugificar cadenas
+    function slugify(text) {
+        return (text || '').toString().toLowerCase()
+            .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-|-$/g, '');
+    }
+
+    // Helper para detectar la carpeta predominante del conjunto de features en la lista
+    function detectDominantFolder() {
+        const checkboxes = document.querySelectorAll('#features-checklist-container input[type="checkbox"]');
+        const counts = {};
+        checkboxes.forEach(chk => {
+            const f = chk.dataset.folder;
+            if (f) counts[f] = (counts[f] || 0) + 1;
+        });
+        let dominant = '';
+        let maxCount = 0;
+        for (const f in counts) {
+            if (counts[f] > maxCount) {
+                maxCount = counts[f];
+                dominant = f;
+            }
+        }
+        return dominant;
+    }
+
     // Formulario de feature personalizada manual
     const toggleCustomBtn = document.getElementById('btn-toggle-add-custom-feature');
     const formCustom = document.getElementById('form-add-custom-feature');
     const btnCancelCustom = document.getElementById('btn-cancel-custom-feature');
     const btnConfirmCustom = document.getElementById('btn-confirm-add-custom-feature');
     const inputCustomName = document.getElementById('custom-feature-name-input');
+    const inputCustomFolder = document.getElementById('custom-feature-folder-input');
     const inputCustomDesc = document.getElementById('custom-feature-desc-input');
 
     if (toggleCustomBtn && formCustom) {
         toggleCustomBtn.addEventListener('click', () => {
             formCustom.classList.toggle('hidden');
-            if (!formCustom.classList.contains('hidden') && inputCustomName) {
-                inputCustomName.focus();
+            if (!formCustom.classList.contains('hidden')) {
+                const dominantFolder = detectDominantFolder();
+                if (inputCustomFolder && dominantFolder) {
+                    inputCustomFolder.value = dominantFolder;
+                }
+                if (inputCustomName) inputCustomName.focus();
             }
         });
     }
@@ -809,6 +841,7 @@ function setupEventListeners() {
         btnCancelCustom.addEventListener('click', () => {
             formCustom.classList.add('hidden');
             if (inputCustomName) inputCustomName.value = '';
+            if (inputCustomFolder) inputCustomFolder.value = '';
             if (inputCustomDesc) inputCustomDesc.value = '';
         });
     }
@@ -817,23 +850,24 @@ function setupEventListeners() {
         btnConfirmCustom.addEventListener('click', () => {
             const nameVal = inputCustomName ? inputCustomName.value.trim() : '';
             const descVal = inputCustomDesc ? inputCustomDesc.value.trim() : '';
+            let folderVal = inputCustomFolder ? slugify(inputCustomFolder.value.trim()) : '';
 
             if (!nameVal) {
                 showToast("Por favor ingresa un nombre para la feature personalizada", "error");
                 return;
             }
 
-            const folderSlug = nameVal.toLowerCase()
-                .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-                .replace(/[^a-z0-9]+/g, '-')
-                .replace(/^-|-$/g, '') || 'custom-feature';
+            const nameSlug = slugify(nameVal) || 'subfeature';
 
-            const customId = 'custom-' + Date.now();
+            if (!folderVal) {
+                folderVal = detectDominantFolder() || nameSlug;
+            }
+
             const featObj = {
-                id: customId,
+                id: nameSlug,
                 name: nameVal,
                 description: descVal || 'Especificación personalizada definida manualmente por el usuario.',
-                folder: folderSlug
+                folder: folderVal
             };
 
             const container = document.getElementById('features-checklist-container');
@@ -848,7 +882,7 @@ function setupEventListeners() {
                     <div class="feature-item-text">
                         <div class="feature-item-title">${featObj.name} <span class="badge" style="background: var(--primary); color: white; font-size: 9px; padding: 1px 6px; border-radius: 4px; margin-left: 6px;">Manual</span></div>
                         <div class="feature-item-desc">${featObj.description}</div>
-                        <div class="feature-item-folder">features/${featObj.folder}</div>
+                        <div class="feature-item-folder">features/${featObj.folder}/${featObj.id}.md</div>
                     </div>
                 `;
 
@@ -860,11 +894,12 @@ function setupEventListeners() {
                 });
 
                 container.appendChild(item);
-                showToast(`Feature "${nameVal}" añadida a la lista`, "success");
+                showToast(`Feature "${nameVal}" añadida en features/${featObj.folder}/`, "success");
             }
 
             formCustom.classList.add('hidden');
             if (inputCustomName) inputCustomName.value = '';
+            if (inputCustomFolder) inputCustomFolder.value = '';
             if (inputCustomDesc) inputCustomDesc.value = '';
         });
     }
