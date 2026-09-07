@@ -3,7 +3,7 @@ import json
 import logging
 from typing import Dict, Any, List, Optional
 from fastapi import FastAPI, HTTPException, Header, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import google.generativeai as genai
@@ -1896,6 +1896,111 @@ REGLAS DE RESPUESTA:
         if is_quota_error(err_msg):
             raise HTTPException(status_code=429, detail=err_msg)
         raise HTTPException(status_code=500, detail=err_msg)
+
+@app.post("/api/copilot-chat-stream")
+def copilot_chat_stream(req: CopilotChatRequest, x_gemini_key: Optional[str] = Header(None), x_gemini_fallback_key: Optional[str] = Header(None), x_gemini_model: Optional[str] = Header(None)):
+    def event_generator():
+        try:
+            model = get_gemini_model(x_gemini_key, x_gemini_fallback_key, x_gemini_model)
+            pdata = req.project_data or {}
+            proj_name = pdata.get("name", "Proyecto Activo")
+            seed_idea = pdata.get("seedIdea", "")
+            answers = pdata.get("answers", {})
+            spec_modules = pdata.get("specModules", {})
+
+            specs_summary = []
+            for fname, content in spec_modules.items():
+                if content and content.strip():
+                    specs_summary.append(f"=== INICIO ARCHIVO SPEC: {fname} ===\n{content.strip()}\n=== FIN ARCHIVO SPEC: {fname} ===")
+
+            specs_summary_text = "\n\n".join(specs_summary) if specs_summary else "Aún no hay archivos de especificación (.md) completos. Solo se cuenta con la idea semilla."
+
+            system_instruction = f"""Eres el "Spec Copilot", un Arquitecto de Software y Product Owner experimentado que conversa sobre el proyecto "{proj_name}".
+
+OBJETIVO:
+Tu misión es actuar como el interlocutor principal entre el usuario y las especificaciones técnicas del proyecto. Responde preguntas, aclara dudas, resume decisiones de diseño, explica la arquitectura o sugiere mejoras en lenguaje claro, amigable y estructurado.
+
+INFORMACIÓN DEL PROYECTO:
+- Nombre: {proj_name}
+- Idea General: {seed_idea}
+- Respuestas del Wizard: {json.dumps(answers, ensure_ascii=False)}
+
+DOCUMENTOS DE ESPECIFICACIÓN DISPONIBLES:
+{specs_summary_text}
+
+REGLAS DE RESPUESTA:
+1. Responde de forma clara, directa y estructurada en Markdown (usa títulos breves, viñetas, bloques de código SQL/JSON/JS cuando aporte valor).
+2. Cita siempre el documento de origen cuando menciones detalles específicos (ejemplo: [product.md], [architecture.md], [database.md], etc.).
+3. Si el usuario te pide un resumen alto nivel, sé sintético y resalta el propósito del proyecto, la arquitectura propuesta y la pila tecnológica.
+4. Mantén un tono profesional, servicial y experto.
+5. SI EL USUARIO TE PIDE CREAR, GENERAR O IMPLEMENTAR UNA NUEVA FUNCIONALIDAD/FEATURE (O CREAR SUS ARCHIVOS .MD):
+   - Explica brevemente la solución arquitectónica.
+   - AL FINAL DE TU RESPUESTA, incluye obligatoriamente una etiqueta con este formato JSON exacto en una sola línea (reemplazando con los valores apropiados):
+     <!-- GENERATE_FEATURE: {{"name": "Nombre de la Feature", "folder": "nombre-carpeta", "description": "Breve descripcion de la feature"}} -->
+"""
+
+            gemini_history = []
+            for msg in (req.history or []):
+                role = "user" if msg.get("role") == "user" else "model"
+                content = msg.get("content", "")
+                if content:
+                    gemini_history.append({"role": role, "parts": [content]})
+
+            chat = model.start_chat(history=gemini_history)
+            full_prompt = f"{system_instruction}\n\nPREGUNTA E INSTRUCCIÓN DEL USUARIO:\n{req.message}"
+
+            response = chat.send_message(full_prompt, stream=True)
+            accumulated_text = ""
+
+            for chunk in response:
+                chunk_text = getattr(chunk, "text", "") or ""
+                if chunk_text:
+                    accumulated_text += chunk_text
+                    data_json = json.dumps({"type": "chunk", "content": chunk_text}, ensure_ascii=False)
+                    yield f"data: {data_json}\n\n"
+
+            reply_text = clean_markdown(accumulated_text)
+
+            # Fallback de seguridad: si el usuario solicitó generar/crear una feature y la IA no generó la etiqueta
+            if "GENERATE_FEATURE:" not in reply_text:
+                user_msg_lower = req.message.lower()
+                trigger_words = ["generar", "crear", "hacer", "implementar", "redactar", "feature", "funcionalidad", "especificacion", "especificación", "md", "fichas", "archivos", "modulo", "módulo", "boton", "botón", "planificar"]
+                if any(w in user_msg_lower for w in trigger_words):
+                    clean_req = req.message.strip().replace('"', '').replace("'", "")
+                    feat_name = clean_req[:40] if len(clean_req) <= 40 else clean_req[:37] + "..."
+                    folder_name = "modulos"
+                    payload_json = json.dumps({
+                        "name": feat_name,
+                        "folder": folder_name,
+                        "description": "Especificación técnica generada desde el chat."
+                    }, ensure_ascii=False)
+                    tag_str = f'\n\n<!-- GENERATE_FEATURE: {payload_json} -->'
+                    reply_text += tag_str
+                    data_json = json.dumps({"type": "chunk", "content": tag_str}, ensure_ascii=False)
+                    yield f"data: {data_json}\n\n"
+
+            # Guardar historial actualizado en el disco del proyecto
+            updated_history = (req.history or []) + [
+                {"role": "user", "content": req.message},
+                {"role": "model", "content": reply_text}
+            ]
+            try:
+                history_file = os.path.join(get_target_project_path(), "chat_history.json")
+                with open(history_file, "w", encoding="utf-8") as f:
+                    json.dump(updated_history, f, ensure_ascii=False, indent=2)
+            except Exception as e:
+                logger.error(f"Error guardando chat_history.json: {str(e)}")
+
+            done_json = json.dumps({"type": "done", "history": updated_history}, ensure_ascii=False)
+            yield f"data: {done_json}\n\n"
+
+        except Exception as e:
+            err_msg = str(e)
+            logger.error(f"Error en copilot-chat-stream: {err_msg}")
+            err_json = json.dumps({"type": "error", "message": err_msg}, ensure_ascii=False)
+            yield f"data: {err_json}\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 @app.get("/api/copilot-history")
 async def get_copilot_history():

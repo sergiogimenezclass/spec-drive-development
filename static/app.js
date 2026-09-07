@@ -2252,18 +2252,13 @@ async function clearCopilotChat() {
                     <p>Conversación reiniciada. ¿En qué más puedo ayudarte sobre las especificaciones del proyecto?</p>
                 </div>
             </div>
-        `;
-    }
-}
+async function sendCopilotMessage(text) {
+    if (!text || !text.trim()) return;
 
-async function sendCopilotMessage(queryText) {
-    const inputEl = document.getElementById('copilot-input');
-    const text = queryText || (inputEl ? inputEl.value.trim() : '');
-    if (!text) return;
-
-    if (inputEl) {
-        inputEl.value = '';
-        inputEl.style.height = 'auto';
+    const input = document.getElementById('copilot-input');
+    if (input) {
+        input.value = '';
+        input.style.height = 'auto';
     }
 
     const container = document.getElementById('copilot-messages');
@@ -2276,7 +2271,7 @@ async function sendCopilotMessage(queryText) {
     const typingId = appendCopilotTyping();
 
     try {
-        const resp = await fetch('/api/copilot-chat', {
+        const resp = await fetch('/api/copilot-chat-stream', {
             method: 'POST',
             headers: getAiHeaders(),
             body: JSON.stringify({
@@ -2293,23 +2288,95 @@ async function sendCopilotMessage(queryText) {
             return;
         }
 
-        const data = await resp.json();
+        if (!resp.ok || !resp.body) {
+            throw new Error(`Error de comunicación con el servidor: HTTP ${resp.status}`);
+        }
+
         removeCopilotTyping(typingId);
 
-        if (data.status === 'success' && data.reply) {
-            if (data.history) {
-                state.copilotHistory = data.history;
-            } else {
-                if (!state.copilotHistory) state.copilotHistory = [];
-                state.copilotHistory.push({ role: 'user', content: text });
-                state.copilotHistory.push({ role: 'model', content: data.reply });
-            }
+        // Crear elemento de mensaje IA para streaming progresivo (efecto máquina de escribir)
+        const msgDiv = document.createElement('div');
+        msgDiv.className = 'copilot-msg msg-ai';
+        msgDiv.innerHTML = `
+            <div class="msg-avatar"><i class="fa-solid fa-robot"></i></div>
+            <div class="msg-body"></div>
+        `;
+        container.appendChild(msgDiv);
+        const msgBody = msgDiv.querySelector('.msg-body');
 
-            appendCopilotMsg('ai', data.reply);
-        } else {
-            const errDetail = data.detail || data.message || "Error al comunicarse con el Copilot.";
-            appendCopilotMsg('ai', `⚠️ ${errDetail}`);
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        let fullText = '';
+        let buffer = '';
+
+        while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n\n');
+            buffer = lines.pop() || '';
+
+            for (const line of lines) {
+                const trimmed = line.trim();
+                if (!trimmed.startsWith('data: ')) continue;
+                try {
+                    const payload = JSON.parse(trimmed.slice(6));
+                    if (payload.type === 'chunk' && payload.content) {
+                        fullText += payload.content;
+
+                        const tagResult = parseFeatureTag(fullText);
+                        const cleanText = tagResult ? fullText.replace(tagResult.fullMatch, '').trim() : fullText;
+                        const parsedHTML = (typeof marked !== 'undefined' && marked.parse) ? marked.parse(cleanText) : `<p>${cleanText}</p>`;
+                        msgBody.innerHTML = parsedHTML;
+                        container.scrollTop = container.scrollHeight;
+                    } else if (payload.type === 'done') {
+                        if (payload.history) {
+                            state.copilotHistory = payload.history;
+                        }
+                    } else if (payload.type === 'error') {
+                        msgBody.innerHTML += `<p style="color:var(--danger)">⚠️ Error: ${payload.message}</p>`;
+                    }
+                } catch (e) {
+                    console.error("Error procesando chunk de streaming:", e);
+                }
+            }
         }
+
+        // Renderizar botón de acción de especificación si la etiqueta está presente
+        const tagResult = parseFeatureTag(fullText);
+        if (tagResult && tagResult.data && tagResult.data.name) {
+            const featData = tagResult.data;
+            const featName = featData.name;
+            const featFolder = featData.folder || 'modulos';
+            const featDesc = featData.description || `Especificación técnica para ${featName}`;
+            const cleanText = fullText.replace(tagResult.fullMatch, '').trim();
+            const parsedHTML = (typeof marked !== 'undefined' && marked.parse) ? marked.parse(cleanText) : `<p>${cleanText}</p>`;
+
+            const actionHTML = `
+                <div class="chat-generate-card" style="margin-top: 12px; padding: 12px 14px; background: rgba(123, 97, 255, 0.12); border: 1px solid var(--primary); border-radius: 8px; text-align: left;">
+                    <div style="font-weight: 600; font-size: 13px; color: var(--primary-hover); margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> Redactar Ficha de Especificación (.md)
+                    </div>
+                    <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 10px;">
+                        ¿Deseas generar el archivo Markdown completo para esta funcionalidad en <code>specs/features/${featFolder}/</code>?
+                    </div>
+                    <button type="button" class="btn btn-primary btn-sm btn-generate-from-chat" data-name="${featName}" data-folder="${featFolder}" data-desc="${featDesc}">
+                        <i class="fa-solid fa-file-circle-plus"></i> Generar especificación .md de ${featName}
+                    </button>
+                </div>
+            `;
+
+            msgBody.innerHTML = parsedHTML + actionHTML;
+            const genBtn = msgBody.querySelector('.btn-generate-from-chat');
+            if (genBtn) {
+                genBtn.addEventListener('click', async () => {
+                    await generateFeatureFromChat(genBtn, genBtn.dataset.name, genBtn.dataset.folder, genBtn.dataset.desc);
+                });
+            }
+            container.scrollTop = container.scrollHeight;
+        }
+
     } catch (e) {
         removeCopilotTyping(typingId);
         console.error("Error en sendCopilotMessage:", e);
@@ -2454,6 +2521,7 @@ async function generateFeatureFromChat(btnEl, name, folder, desc) {
             const targetKey = `features/${folderSlug}/${featSlug}`;
             selectSpecFile(targetKey);
             showToast(`¡Ficha ${targetKey}.md creada y guardada con éxito!`, "success");
+            appendCopilotMsg('ai', `✅ **¡Archivo Creado!** Se ha redactado y guardado exitosamente el archivo \`specs/features/${folderSlug}/${featSlug}.md\`. Ya la puedes visualizar y editar en el panel de especificaciones a la izquierda.`);
 
             if (btnEl) {
                 btnEl.innerHTML = `<i class="fa-solid fa-circle-check"></i> Especificación creada`;
