@@ -1843,7 +1843,7 @@ REGLAS DE RESPUESTA:
 5. SI EL USUARIO TE PIDE CREAR, GENERAR O IMPLEMENTAR UNA NUEVA FUNCIONALIDAD/FEATURE (O CREAR SUS ARCHIVOS .MD):
    - Explica brevemente la solución arquitectónica.
    - AL FINAL DE TU RESPUESTA, incluye obligatoriamente una etiqueta con este formato JSON exacto en una sola línea (reemplazando con los valores apropiados):
-     <!-- GENERATE_FEATURE: {"name": "Nombre de la Feature", "folder": "nombre-carpeta", "description": "Breve descripcion de la feature"} -->
+     <!-- GENERATE_FEATURE: {{"name": "Nombre de la Feature", "folder": "nombre-carpeta", "description": "Breve descripcion de la feature"}} -->
 """
 
         gemini_history = []
