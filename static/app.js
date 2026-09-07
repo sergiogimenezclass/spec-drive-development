@@ -1986,15 +1986,15 @@ function startPollingGenerationStatus() {
                 
                 const curFileEl = document.getElementById('loader-current-file');
                 if (curFileEl) {
-                    curFileEl.innerText = data.current_filename 
-                        ? `Redactando: ${data.current_filename}`
+                    curFileEl.innerHTML = data.current_filename 
+                        ? `<i class="fa-solid fa-spinner fa-spin" style="margin-right: 6px; color: var(--primary);"></i> Redactando con IA: <strong style="color: var(--text-primary);">${data.current_filename}</strong>`
                         : `Procesando especificaciones...`;
                 }
 
                 const statusTextEl = document.getElementById('loader-status-text');
                 if (statusTextEl) {
                     statusTextEl.innerText = data.current_filename 
-                        ? `Generando ${data.current_filename} (${completedCount + 1} de ${total})...`
+                        ? `La IA está redactando ${data.current_filename} (${completedCount + 1} de ${total})...`
                         : `Generando los 17 archivos de especificación en formato Markdown...`;
                 }
 
@@ -2005,16 +2005,23 @@ function startPollingGenerationStatus() {
                 if (fillEl) fillEl.style.width = `${percent}%`;
 
                 const countEl = document.getElementById('loader-count-text');
-                if (countEl) countEl.innerText = `${completedCount} de ${total} archivos generados`;
+                if (countEl) countEl.innerText = `${completedCount} de ${total} listos en disco`;
 
                 const remEl = document.getElementById('loader-remaining-text');
                 if (remEl) remEl.innerText = `Faltan ${remaining > 0 ? remaining : 0} archivos`;
 
                 const chipsContainer = document.getElementById('loader-completed-chips');
-                if (chipsContainer && data.completed_files) {
-                    chipsContainer.innerHTML = data.completed_files.map(f => 
-                        `<span style="font-size: 11px; background: rgba(0, 230, 118, 0.15); color: #00e676; padding: 2px 8px; border-radius: 12px; border: 1px solid rgba(0, 230, 118, 0.3);"><i class="fa-solid fa-check"></i> ${f}</span>`
-                    ).join('');
+                if (chipsContainer) {
+                    let chipsHtml = '';
+                    if (data.completed_files && data.completed_files.length > 0) {
+                        chipsHtml += data.completed_files.map(f => 
+                            `<span style="font-size: 11px; background: rgba(0, 230, 118, 0.15); color: #00e676; padding: 2px 8px; border-radius: 12px; border: 1px solid rgba(0, 230, 118, 0.3);"><i class="fa-solid fa-check"></i> ${f}</span>`
+                        ).join('');
+                    }
+                    if (data.current_filename && (!data.completed_files || !data.completed_files.includes(data.current_filename))) {
+                        chipsHtml += `<span style="font-size: 11px; background: rgba(123, 97, 255, 0.2); color: var(--primary-hover); padding: 2px 8px; border-radius: 12px; border: 1px solid var(--primary);"><i class="fa-solid fa-spinner fa-spin"></i> ${data.current_filename}</span>`;
+                    }
+                    chipsContainer.innerHTML = chipsHtml;
                 }
             }
         } catch (e) {

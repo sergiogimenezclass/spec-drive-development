@@ -671,7 +671,7 @@ async def select_folder_dialog():
     return res
 
 @app.post("/api/analyze-idea")
-async def analyze_idea(req: IdeaAnalysisRequest, x_gemini_key: Optional[str] = Header(None), x_gemini_fallback_key: Optional[str] = Header(None), x_gemini_model: Optional[str] = Header(None)):
+def analyze_idea(req: IdeaAnalysisRequest, x_gemini_key: Optional[str] = Header(None), x_gemini_fallback_key: Optional[str] = Header(None), x_gemini_model: Optional[str] = Header(None)):
     model = get_gemini_model(x_gemini_key, x_gemini_fallback_key, x_gemini_model)
     
     prompt = f"""
@@ -741,7 +741,7 @@ async def analyze_idea(req: IdeaAnalysisRequest, x_gemini_key: Optional[str] = H
         }
 
 @app.post("/api/next-questions")
-async def next_questions(req: NextQuestionsRequest, x_gemini_key: Optional[str] = Header(None), x_gemini_fallback_key: Optional[str] = Header(None), x_gemini_model: Optional[str] = Header(None)):
+def next_questions(req: NextQuestionsRequest, x_gemini_key: Optional[str] = Header(None), x_gemini_fallback_key: Optional[str] = Header(None), x_gemini_model: Optional[str] = Header(None)):
     model = get_gemini_model(x_gemini_key, x_gemini_fallback_key, x_gemini_model)
     
     prompt = f"""
@@ -778,7 +778,7 @@ async def next_questions(req: NextQuestionsRequest, x_gemini_key: Optional[str] 
         return {"questions": []}
 
 @app.post("/api/generate-diagram")
-async def generate_diagram(req: DiagramRequest, x_gemini_key: Optional[str] = Header(None), x_gemini_fallback_key: Optional[str] = Header(None), x_gemini_model: Optional[str] = Header(None)):
+def generate_diagram(req: DiagramRequest, x_gemini_key: Optional[str] = Header(None), x_gemini_fallback_key: Optional[str] = Header(None), x_gemini_model: Optional[str] = Header(None)):
     model = get_gemini_model(x_gemini_key, x_gemini_fallback_key, x_gemini_model)
     
     prompt = f"""
@@ -815,7 +815,7 @@ async def generate_diagram(req: DiagramRequest, x_gemini_key: Optional[str] = He
         return {"code": "graph TD\n  A[Error al generar el diagrama] --> B[Verifica tu API Key]"}
 
 @app.post("/api/check-consistency")
-async def check_consistency(req: SaveProjectRequest, x_gemini_key: Optional[str] = Header(None), x_gemini_fallback_key: Optional[str] = Header(None), x_gemini_model: Optional[str] = Header(None)):
+def check_consistency(req: SaveProjectRequest, x_gemini_key: Optional[str] = Header(None), x_gemini_fallback_key: Optional[str] = Header(None), x_gemini_model: Optional[str] = Header(None)):
     model = get_gemini_model(x_gemini_key, x_gemini_fallback_key, x_gemini_model)
     
     prompt = f"""
@@ -1011,7 +1011,7 @@ def clean_markdown(text: str) -> str:
     return text
 
 @app.post("/api/export-specs")
-async def export_specs(req: SaveProjectRequest, x_gemini_key: Optional[str] = Header(None), x_gemini_fallback_key: Optional[str] = Header(None), x_gemini_model: Optional[str] = Header(None)):
+def export_specs(req: SaveProjectRequest, x_gemini_key: Optional[str] = Header(None), x_gemini_fallback_key: Optional[str] = Header(None), x_gemini_model: Optional[str] = Header(None)):
     global GENERATION_STATUS
     model = get_gemini_model(x_gemini_key, x_gemini_fallback_key, x_gemini_model)
     specs_dir = get_specs_dir()
@@ -1462,7 +1462,7 @@ async def export_specs(req: SaveProjectRequest, x_gemini_key: Optional[str] = He
     }
 
 @app.post("/api/plan-features")
-async def plan_features(req: PlanFeaturesRequest, x_gemini_key: Optional[str] = Header(None), x_gemini_fallback_key: Optional[str] = Header(None), x_gemini_model: Optional[str] = Header(None)):
+def plan_features(req: PlanFeaturesRequest, x_gemini_key: Optional[str] = Header(None), x_gemini_fallback_key: Optional[str] = Header(None), x_gemini_model: Optional[str] = Header(None)):
     model = get_gemini_model(x_gemini_key, x_gemini_fallback_key, x_gemini_model)
     project = req.project_data
     answers = project.get("answers", {})
@@ -1561,7 +1561,7 @@ class GenerateFeatureRequest(BaseModel):
     feature: dict
 
 @app.post("/api/generate-feature")
-async def generate_feature(req: GenerateFeatureRequest, x_gemini_key: Optional[str] = Header(None), x_gemini_fallback_key: Optional[str] = Header(None), x_gemini_model: Optional[str] = Header(None)):
+def generate_feature(req: GenerateFeatureRequest, x_gemini_key: Optional[str] = Header(None), x_gemini_fallback_key: Optional[str] = Header(None), x_gemini_model: Optional[str] = Header(None)):
     model = get_gemini_model(x_gemini_key, x_gemini_fallback_key, x_gemini_model)
     project = req.project_data
     feature = req.feature
@@ -1771,7 +1771,7 @@ async def autocomplete_file(req: AutocompleteFileRequest, x_gemini_key: str = He
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/copilot-chat")
-async def copilot_chat(req: CopilotChatRequest, x_gemini_key: Optional[str] = Header(None), x_gemini_fallback_key: Optional[str] = Header(None), x_gemini_model: Optional[str] = Header(None)):
+def copilot_chat(req: CopilotChatRequest, x_gemini_key: Optional[str] = Header(None), x_gemini_fallback_key: Optional[str] = Header(None), x_gemini_model: Optional[str] = Header(None)):
     try:
         model = get_gemini_model(x_gemini_key, x_gemini_fallback_key, x_gemini_model)
         pdata = req.project_data or {}
