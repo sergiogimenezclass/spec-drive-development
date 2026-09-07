@@ -471,6 +471,23 @@
                         <!-- Lista de features con checkboxes -->
                     </div>
                     
+                    <!-- Botón y formulario para agregar feature manual -->
+                    <div id="add-custom-feature-container" style="margin-top: 12px; padding: 12px; background: rgba(255,255,255,0.03); border: 1px dashed var(--border-color); border-radius: var(--radius-md);">
+                        <div id="btn-toggle-add-custom-feature" style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--primary-hover); cursor: pointer;">
+                            <i class="fa-solid fa-circle-plus"></i> + Agregar Feature Manual Personalizada
+                        </div>
+                        <div id="form-add-custom-feature" class="hidden" style="margin-top: 10px; display: flex; flex-direction: column; gap: 8px;">
+                            <input type="text" id="custom-feature-name-input" placeholder="Nombre de la Feature (ej: Exportar catálogo a PDF)" style="width: 100%; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-surface-hover); color: var(--text-primary); font-size: 13px; outline: none;">
+                            <textarea id="custom-feature-desc-input" placeholder="Breve descripción o reglas de negocio principales (opcional)..." style="width: 100%; min-height: 50px; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-surface-hover); color: var(--text-primary); font-size: 12px; resize: vertical; outline: none;"></textarea>
+                            <div style="display: flex; gap: 8px; justify-content: flex-end;">
+                                <button type="button" id="btn-cancel-custom-feature" class="btn btn-border btn-sm" style="font-size: 11px;">Cancelar</button>
+                                <button type="button" id="btn-confirm-add-custom-feature" class="btn btn-primary btn-sm" style="font-size: 11px;">
+                                    <i class="fa-solid fa-check"></i> Añadir a la Lista
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <div class="modal-footer" style="margin-top: var(--spacing-lg); display: flex; gap: var(--spacing-sm); justify-content: flex-end;">
                         <button id="btn-cancel-generation" class="btn btn-border btn-sm">Cancelar</button>
                         <button id="btn-submit-generation" class="btn btn-primary btn-sm">Generar Seleccionadas</button>

@@ -788,6 +788,87 @@ function setupEventListeners() {
     document.getElementById('btn-start-planning-analysis').addEventListener('click', runPlanningAnalysis);
     document.getElementById('btn-submit-generation').addEventListener('click', submitFeatureGeneration);
 
+    // Formulario de feature personalizada manual
+    const toggleCustomBtn = document.getElementById('btn-toggle-add-custom-feature');
+    const formCustom = document.getElementById('form-add-custom-feature');
+    const btnCancelCustom = document.getElementById('btn-cancel-custom-feature');
+    const btnConfirmCustom = document.getElementById('btn-confirm-add-custom-feature');
+    const inputCustomName = document.getElementById('custom-feature-name-input');
+    const inputCustomDesc = document.getElementById('custom-feature-desc-input');
+
+    if (toggleCustomBtn && formCustom) {
+        toggleCustomBtn.addEventListener('click', () => {
+            formCustom.classList.toggle('hidden');
+            if (!formCustom.classList.contains('hidden') && inputCustomName) {
+                inputCustomName.focus();
+            }
+        });
+    }
+
+    if (btnCancelCustom && formCustom) {
+        btnCancelCustom.addEventListener('click', () => {
+            formCustom.classList.add('hidden');
+            if (inputCustomName) inputCustomName.value = '';
+            if (inputCustomDesc) inputCustomDesc.value = '';
+        });
+    }
+
+    if (btnConfirmCustom) {
+        btnConfirmCustom.addEventListener('click', () => {
+            const nameVal = inputCustomName ? inputCustomName.value.trim() : '';
+            const descVal = inputCustomDesc ? inputCustomDesc.value.trim() : '';
+
+            if (!nameVal) {
+                showToast("Por favor ingresa un nombre para la feature personalizada", "error");
+                return;
+            }
+
+            const folderSlug = nameVal.toLowerCase()
+                .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+                .replace(/[^a-z0-9]+/g, '-')
+                .replace(/^-|-$/g, '') || 'custom-feature';
+
+            const customId = 'custom-' + Date.now();
+            const featObj = {
+                id: customId,
+                name: nameVal,
+                description: descVal || 'Especificación personalizada definida manualmente por el usuario.',
+                folder: folderSlug
+            };
+
+            const container = document.getElementById('features-checklist-container');
+            if (container) {
+                const item = document.createElement('div');
+                item.className = 'feature-checklist-item';
+                item.style.borderColor = 'var(--primary)';
+                item.style.background = 'rgba(123, 97, 255, 0.08)';
+
+                item.innerHTML = `
+                    <input type="checkbox" id="chk-feat-${featObj.id}" data-id="${featObj.id}" data-name="${featObj.name}" data-desc="${featObj.description}" data-folder="${featObj.folder}" checked>
+                    <div class="feature-item-text">
+                        <div class="feature-item-title">${featObj.name} <span class="badge" style="background: var(--primary); color: white; font-size: 9px; padding: 1px 6px; border-radius: 4px; margin-left: 6px;">Manual</span></div>
+                        <div class="feature-item-desc">${featObj.description}</div>
+                        <div class="feature-item-folder">features/${featObj.folder}</div>
+                    </div>
+                `;
+
+                item.addEventListener('click', (e) => {
+                    if (e.target.tagName !== 'INPUT') {
+                        const chk = item.querySelector('input[type="checkbox"]');
+                        chk.checked = !chk.checked;
+                    }
+                });
+
+                container.appendChild(item);
+                showToast(`Feature "${nameVal}" añadida a la lista`, "success");
+            }
+
+            formCustom.classList.add('hidden');
+            if (inputCustomName) inputCustomName.value = '';
+            if (inputCustomDesc) inputCustomDesc.value = '';
+        });
+    }
+
     // Abrir la carpeta de especificaciones local en el editor
     document.getElementById('btn-open-in-editor').addEventListener('click', async () => {
         try {
