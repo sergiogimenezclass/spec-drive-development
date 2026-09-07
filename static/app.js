@@ -1567,17 +1567,20 @@ function renderSpecTree() {
             nav.appendChild(folderItem);
             
             folders[folderName].forEach(feat => {
+                const featureFileName = feat.filename || (feat.folder && feat.id ? `features/${feat.folder}/${feat.id}` : feat.id);
+                const featureTitle = feat.name || feat.title || feat.id || featureFileName;
+                
                 const fItem = document.createElement('div');
-                fItem.className = `spec-tree-item feature-item ${state.activeSpecFile === feat.filename ? 'active' : ''}`;
+                fItem.className = `spec-tree-item feature-item ${state.activeSpecFile === featureFileName ? 'active' : ''}`;
                 fItem.style.paddingLeft = "28px";
                 fItem.innerHTML = `
                     <div class="spec-item-left">
                         <i class="fa-regular fa-file-code" style="font-size: 11px;"></i>
-                        <span>${feat.title || feat.filename}</span>
+                        <span>${featureTitle}</span>
                     </div>
                 `;
                 fItem.addEventListener('click', () => {
-                    selectSpecFile(feat.filename);
+                    selectSpecFile(featureFileName);
                 });
                 nav.appendChild(fItem);
             });
