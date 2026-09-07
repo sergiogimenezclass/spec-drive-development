@@ -2203,6 +2203,14 @@ function toggleCopilotPanel() {
     const panel = document.getElementById('workspace-copilot-panel');
     if (!panel) return;
     panel.classList.toggle('hidden');
+    if (!panel.classList.contains('hidden')) {
+        const container = document.getElementById('copilot-messages');
+        if (container) {
+            setTimeout(() => {
+                container.scrollTop = container.scrollHeight;
+            }, 60);
+        }
+    }
 }
 
 async function loadCopilotHistory() {
@@ -2218,7 +2226,9 @@ async function loadCopilotHistory() {
                     const role = (msg.role === 'user') ? 'user' : 'ai';
                     appendCopilotMsg(role, msg.content, false);
                 });
-                container.scrollTop = container.scrollHeight;
+                setTimeout(() => {
+                    container.scrollTop = container.scrollHeight;
+                }, 60);
             }
         }
     } catch (e) {
@@ -2311,10 +2321,45 @@ function appendCopilotMsg(role, text, autoScroll = true) {
     const container = document.getElementById('copilot-messages');
     if (!container) return;
 
+    let featureActionData = null;
+    let cleanText = text;
+
+    // Detectar etiqueta GENERATE_FEATURE
+    const tagMatch = text.match(/<!--\s*GENERATE_FEATURE:\s*({.*?})\s*-->/s) || text.match(/GENERATE_FEATURE:\s*({.*?})/s);
+    if (tagMatch && tagMatch[1]) {
+        try {
+            featureActionData = JSON.parse(tagMatch[1]);
+            cleanText = text.replace(tagMatch[0], '').trim();
+        } catch (e) {
+            console.error("Error parseando GENERATE_FEATURE tag:", e);
+        }
+    }
+
     const msgDiv = document.createElement('div');
     msgDiv.className = `copilot-msg msg-${role}`;
 
-    const parsedHTML = (typeof marked !== 'undefined' && marked.parse) ? marked.parse(text) : `<p>${text}</p>`;
+    const parsedHTML = (typeof marked !== 'undefined' && marked.parse) ? marked.parse(cleanText) : `<p>${cleanText}</p>`;
+
+    let actionHTML = '';
+    if (featureActionData && featureActionData.name) {
+        const featName = featureActionData.name;
+        const featFolder = featureActionData.folder || 'general';
+        const featDesc = featureActionData.description || `Especificación técnica para ${featName}`;
+
+        actionHTML = `
+            <div class="chat-generate-card" style="margin-top: 12px; padding: 12px 14px; background: rgba(123, 97, 255, 0.12); border: 1px solid var(--primary); border-radius: 8px; text-align: left;">
+                <div style="font-weight: 600; font-size: 13px; color: var(--primary-hover); margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> Redactar Ficha de Especificación (.md)
+                </div>
+                <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 10px;">
+                    ¿Deseas generar el archivo Markdown completo para esta funcionalidad en <code>specs/features/${featFolder}/</code>?
+                </div>
+                <button type="button" class="btn btn-primary btn-sm btn-generate-from-chat" data-name="${featName}" data-folder="${featFolder}" data-desc="${featDesc}">
+                    <i class="fa-solid fa-file-circle-plus"></i> Generar especificación .md de ${featName}
+                </button>
+            </div>
+        `;
+    }
 
     msgDiv.innerHTML = `
         <div class="msg-avatar">
@@ -2322,12 +2367,82 @@ function appendCopilotMsg(role, text, autoScroll = true) {
         </div>
         <div class="msg-body">
             ${parsedHTML}
+            ${actionHTML}
         </div>
     `;
 
+    const genBtn = msgDiv.querySelector('.btn-generate-from-chat');
+    if (genBtn) {
+        genBtn.addEventListener('click', async () => {
+            await generateFeatureFromChat(genBtn, genBtn.dataset.name, genBtn.dataset.folder, genBtn.dataset.desc);
+        });
+    }
+
     container.appendChild(msgDiv);
     if (autoScroll) {
-        container.scrollTop = container.scrollHeight;
+        setTimeout(() => {
+            container.scrollTop = container.scrollHeight;
+        }, 50);
+    }
+}
+
+async function generateFeatureFromChat(btnEl, name, folder, desc) {
+    if (btnEl) {
+        btnEl.disabled = true;
+        btnEl.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Redactando especificación por IA...`;
+    }
+
+    const folderSlug = (folder || 'general').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'general';
+    const featSlug = (name || 'feature').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'subfeature';
+
+    const featObj = {
+        id: featSlug,
+        name: name,
+        description: desc || `Especificación para ${name}`,
+        folder: folderSlug
+    };
+
+    showToast(`Generando especificación .md para ${name}...`, "info");
+
+    try {
+        const response = await fetch('/api/generate-feature', {
+            method: 'POST',
+            headers: getAiHeaders(),
+            body: JSON.stringify({
+                project_data: state.currentProject,
+                feature: featObj
+            })
+        });
+
+        const data = await response.json();
+        if (data.status === 'success') {
+            const loadResp = await fetch('/api/load-project');
+            const loadData = await loadResp.json();
+            if (loadData.status === 'success' && loadData.project) {
+                state.currentProject = loadData.project;
+            }
+
+            renderSpecTree();
+            const targetKey = `features/${folderSlug}/${featSlug}`;
+            selectSpecFile(targetKey);
+            showToast(`¡Ficha ${targetKey}.md creada y guardada con éxito!`, "success");
+
+            if (btnEl) {
+                btnEl.innerHTML = `<i class="fa-solid fa-circle-check"></i> Especificación creada`;
+                btnEl.style.background = 'rgba(0, 230, 118, 0.2)';
+                btnEl.style.borderColor = '#00e676';
+                btnEl.style.color = '#00e676';
+            }
+        } else {
+            throw new Error(data.message || "Error al generar la especificación");
+        }
+    } catch (e) {
+        console.error(e);
+        showToast("Error al generar la especificación desde el chat", "error");
+        if (btnEl) {
+            btnEl.disabled = false;
+            btnEl.innerHTML = `<i class="fa-solid fa-file-circle-plus"></i> Reintentar generación`;
+        }
     }
 }
 
@@ -2350,7 +2465,9 @@ function appendCopilotTyping() {
         </div>
     `;
     container.appendChild(msgDiv);
-    container.scrollTop = container.scrollHeight;
+    setTimeout(() => {
+        container.scrollTop = container.scrollHeight;
+    }, 40);
     return typingId;
 }
 

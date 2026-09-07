@@ -1840,6 +1840,10 @@ REGLAS DE RESPUESTA:
 2. Cita siempre el documento de origen cuando menciones detalles específicos (ejemplo: [product.md], [architecture.md], [database.md], etc.).
 3. Si el usuario te pide un resumen alto nivel, sé sintético y resalta el propósito del proyecto, la arquitectura propuesta y la pila tecnológica.
 4. Mantén un tono profesional, servicial y experto.
+5. SI EL USUARIO TE PIDE CREAR, GENERAR O IMPLEMENTAR UNA NUEVA FUNCIONALIDAD/FEATURE (O CREAR SUS ARCHIVOS .MD):
+   - Explica brevemente la solución arquitectónica.
+   - AL FINAL DE TU RESPUESTA, incluye obligatoriamente una etiqueta con este formato JSON exacto en una sola línea (reemplazando con los valores apropiados):
+     <!-- GENERATE_FEATURE: {"name": "Nombre de la Feature", "folder": "nombre-carpeta", "description": "Breve descripcion de la feature"} -->
 """
 
         gemini_history = []
