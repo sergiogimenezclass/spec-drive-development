@@ -548,6 +548,14 @@ async def get_generation_status():
         "percent": percent
     }
 
+@app.post("/api/cancel-generation")
+def cancel_generation():
+    global GENERATION_STATUS
+    GENERATION_STATUS["cancel_requested"] = True
+    GENERATION_STATUS["is_generating"] = False
+    logger.info("Solicitud de cancelación de generación de especificaciones recibida.")
+    return {"status": "success", "message": "Generación cancelada."}
+
 @app.get("/api/project-path")
 async def get_project_path():
     current_path = get_target_project_path()
@@ -1070,7 +1078,16 @@ def export_specs(req: SaveProjectRequest, x_gemini_key: Optional[str] = Header(N
         except Exception as err:
             logger.error(f"Error escribiendo {fname} en disco: {str(err)}")
 
+    def check_cancel():
+        if GENERATION_STATUS.get("cancel_requested", False):
+            logger.info("Generación de especificaciones abortada por cancelación del usuario.")
+            GENERATION_STATUS["is_generating"] = False
+            return True
+        return False
+
     # 1. Generar product.md
+    if check_cancel():
+        return {"status": "cancelled", "detail": "Generación cancelada por el usuario."}
     try:
         GENERATION_STATUS["current_filename"] = "product.md"
         filepath = os.path.join(specs_dir, "product.md")
@@ -1102,6 +1119,8 @@ def export_specs(req: SaveProjectRequest, x_gemini_key: Optional[str] = Header(N
         logger.error(f"Error generando product.md por IA: {str(e)}")
 
     # 2. architecture.md
+    if check_cancel():
+        return {"status": "cancelled", "detail": "Generación cancelada por el usuario."}
     try:
         GENERATION_STATUS["current_filename"] = "architecture.md"
         filepath = os.path.join(specs_dir, "architecture.md")
@@ -1131,6 +1150,8 @@ def export_specs(req: SaveProjectRequest, x_gemini_key: Optional[str] = Header(N
         logger.error(f"Error generando architecture.md por IA: {str(e)}")
 
     # 3. database.md
+    if check_cancel():
+        return {"status": "cancelled", "detail": "Generación cancelada por el usuario."}
     try:
         GENERATION_STATUS["current_filename"] = "database.md"
         filepath = os.path.join(specs_dir, "database.md")
@@ -1161,6 +1182,8 @@ def export_specs(req: SaveProjectRequest, x_gemini_key: Optional[str] = Header(N
         logger.error(f"Error generando database.md por IA: {str(e)}")
 
     # 4. api.md
+    if check_cancel():
+        return {"status": "cancelled", "detail": "Generación cancelada por el usuario."}
     try:
         GENERATION_STATUS["current_filename"] = "api.md"
         filepath = os.path.join(specs_dir, "api.md")
@@ -1190,6 +1213,8 @@ def export_specs(req: SaveProjectRequest, x_gemini_key: Optional[str] = Header(N
         logger.error(f"Error generando api.md por IA: {str(e)}")
 
     # 4b. openapi.json
+    if check_cancel():
+        return {"status": "cancelled", "detail": "Generación cancelada por el usuario."}
     try:
         GENERATION_STATUS["current_filename"] = "openapi.json"
         filepath = os.path.join(specs_dir, "openapi.json")
@@ -1230,6 +1255,8 @@ def export_specs(req: SaveProjectRequest, x_gemini_key: Optional[str] = Header(N
         logger.error(f"Error generando openapi.json por IA: {str(e)}")
 
     # 4c. glossary.md
+    if check_cancel():
+        return {"status": "cancelled", "detail": "Generación cancelada por el usuario."}
     try:
         GENERATION_STATUS["current_filename"] = "glossary.md"
         filepath = os.path.join(specs_dir, "glossary.md")
@@ -1256,6 +1283,8 @@ def export_specs(req: SaveProjectRequest, x_gemini_key: Optional[str] = Header(N
         logger.error(f"Error generando glossary.md por IA: {str(e)}")
 
     # 4d. agents.md
+    if check_cancel():
+        return {"status": "cancelled", "detail": "Generación cancelada por el usuario."}
     try:
         GENERATION_STATUS["current_filename"] = "agents.md"
         filepath = os.path.join(specs_dir, "agents.md")
@@ -1292,6 +1321,8 @@ def export_specs(req: SaveProjectRequest, x_gemini_key: Optional[str] = Header(N
 
     # Plantillas de fallback para los archivos
     for filename in files_to_generate:
+        if check_cancel():
+            return {"status": "cancelled", "detail": "Generación cancelada por el usuario."}
         GENERATION_STATUS["current_filename"] = filename
         content = ""
         

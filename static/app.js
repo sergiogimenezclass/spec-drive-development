@@ -587,8 +587,9 @@ function setupEventListeners() {
     document.getElementById('wizard-prev-btn').addEventListener('click', handleWizardPrev);
     document.getElementById('wizard-finish-btn').addEventListener('click', finishInterviewAndGenerateSpecs);
 
-    // Exportar Specs
+    // Exportar Specs y Cancelar Generación
     document.getElementById('btn-export-specs').addEventListener('click', exportSpecsToDisk);
+    document.getElementById('cancel-generation-btn')?.addEventListener('click', cancelGeneration);
 
     // Modal de Onboarding / Guía de Specs
     const onboardingModal = document.getElementById('onboarding-modal');
@@ -2037,6 +2038,20 @@ function stopPollingGenerationStatus() {
     }
     const container = document.getElementById('loader-progress-container');
     if (container) container.classList.add('hidden');
+}
+
+async function cancelGeneration() {
+    try {
+        showToast("Cancelando redacción de especificaciones...", "info");
+        await fetch('/api/cancel-generation', { method: 'POST' });
+        stopPollingGenerationStatus();
+        showToast("Generación cancelada por el usuario", "warning");
+        loadWorkspace();
+    } catch (e) {
+        console.error("Error al cancelar la generación:", e);
+        stopPollingGenerationStatus();
+        loadWorkspace();
+    }
 }
 
 /* ==========================================================================
