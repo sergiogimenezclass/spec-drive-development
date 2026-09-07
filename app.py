@@ -164,9 +164,10 @@ class UnifiedResponse:
         self.text = text
 
 def call_openai_compatible_api(api_key: str, model_name: str, messages: list, json_mode: bool = False, base_url: str = "https://api.deepseek.com/chat/completions") -> str:
+    clean_key = (api_key or "").strip()
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {api_key}"
+        "Authorization": f"Bearer {clean_key}"
     }
     m_name = model_name if model_name in ["deepseek-chat", "deepseek-reasoner"] else "deepseek-chat"
     payload = {
@@ -307,12 +308,10 @@ class GeminiModelWrapper:
 
                     res_text = call_openai_compatible_api(key, self.model_name, messages, json_mode=json_mode)
                     return UnifiedResponse(res_text)
-                except HTTPException as http_e:
-                    raise http_e
                 except Exception as ds_err:
                     last_error = ds_err
                     err_str = str(ds_err)
-                    logger.error(f"Error con proveedor DeepSeek: {err_str}")
+                    logger.error(f"Error con proveedor DeepSeek en clave #{idx+1}: {err_str}")
                     if is_quota_error(err_str):
                         has_any_quota_err = True
                         quota_err_str = err_str
@@ -320,7 +319,7 @@ class GeminiModelWrapper:
 
             try:
                 genai.configure(api_key=key)
-                m = genai.GenerativeModel(self.model_name)
+                m = genai.GenerativeModel(self.model_name if not self.model_name.startswith("deepseek") else "gemini-2.5-flash")
                 return m.generate_content(contents, **kwargs)
             except Exception as e:
                 last_error = e
@@ -396,12 +395,10 @@ class GeminiModelWrapper:
                 try:
                     logger.info(f"Iniciando chat con proveedor DeepSeek ({self.model_name})")
                     return DeepSeekChatSessionWrapper(key, self.model_name, history=history)
-                except HTTPException as http_e:
-                    raise http_e
                 except Exception as ds_err:
                     last_error = ds_err
                     err_str = str(ds_err)
-                    logger.error(f"Error iniciando chat con DeepSeek: {err_str}")
+                    logger.error(f"Error iniciando chat con DeepSeek en clave #{idx+1}: {err_str}")
                     if is_quota_error(err_str):
                         has_any_quota_err = True
                         quota_err_str = err_str
@@ -914,11 +911,8 @@ async def load_project():
         with open(project_file, "r", encoding="utf-8") as f:
             project_data = json.load(f)
             
-        # Sincronizar specModules y featuresList con los archivos reales en el disco si existen
-        if "specModules" not in project_data:
-            project_data["specModules"] = {}
-            
         disk_features = []
+        disk_modules = {}
             
         if os.path.exists(specs_dir):
             for filename in os.listdir(specs_dir):
@@ -927,9 +921,12 @@ async def load_project():
                     name_key = filename.replace(".md", "").replace(".json", "")
                     try:
                         with open(filepath, "r", encoding="utf-8") as file_obj:
-                            project_data["specModules"][name_key] = file_obj.read().strip()
+                            disk_modules[name_key] = file_obj.read().strip()
                     except Exception as e:
                         logger.error(f"Error leyendo archivo en load_project: {str(e)}")
+            
+        # Reemplazar specModules estrictamente por lo que existe actualmente en el disco
+        project_data["specModules"] = disk_modules
             
             # Sincronizar también para las features dinámicas
             features_dir = os.path.join(specs_dir, "features")
@@ -958,6 +955,13 @@ async def load_project():
             project_data["featuresList"] = disk_features
         else:
             project_data["featuresList"] = []
+
+        # Guardar la versión sincronizada de project_data en project.json
+        try:
+            with open(project_file, "w", encoding="utf-8") as pf:
+                json.dump(project_data, pf, ensure_ascii=False, indent=2)
+        except Exception as p_err:
+            logger.error(f"Error guardando project_data sincronizado: {str(p_err)}")
                                      
         return {"status": "success", "project": project_data}
     except Exception as e:
@@ -977,6 +981,7 @@ def clean_markdown(text: str) -> str:
 
 @app.post("/api/export-specs")
 async def export_specs(req: SaveProjectRequest, x_gemini_key: Optional[str] = Header(None), x_gemini_fallback_key: Optional[str] = Header(None), x_gemini_model: Optional[str] = Header(None)):
+    global GENERATION_STATUS
     model = get_gemini_model(x_gemini_key, x_gemini_fallback_key, x_gemini_model)
     specs_dir = get_specs_dir()
     project_file = get_project_file()
@@ -1027,6 +1032,8 @@ async def export_specs(req: SaveProjectRequest, x_gemini_key: Optional[str] = He
             if fname not in GENERATION_STATUS["completed_files"]:
                 GENERATION_STATUS["completed_files"].append(fname)
             
+            GENERATION_STATUS["current_index"] = len(GENERATION_STATUS["completed_files"])
+            GENERATION_STATUS["current_filename"] = fname
             GENERATION_STATUS["percent"] = int((len(GENERATION_STATUS["completed_files"]) / GENERATION_STATUS["total_files"]) * 100)
             logger.info(f"Guardado inmediato en disco: {filepath}")
         except Exception as err:
@@ -1034,173 +1041,227 @@ async def export_specs(req: SaveProjectRequest, x_gemini_key: Optional[str] = He
 
     # 1. Generar product.md
     try:
-        prod_prompt = f"""
-        Eres un Staff Software Architect y Product Designer.
-        Genera el contenido completo en formato Markdown para el archivo 'product.md'.
-        Debe incluir:
-        1. Visión General del Producto y Propuesta de Valor.
-        2. Objetivos de Negocio y Métricas de Éxito.
-        3. Usuarios, Actores y sus Roles detallados.
-        4. Reglas de Negocio Críticas e Inquebrantables (como validaciones lógicas obligatorias, límites de dominio, ej: stock nunca negativo, borrados lógicos obligatorios, etc. estructurados como una lista clara con ejemplos).
-        5. Casos de Uso principales e Historias clave.
-        
-        Basándote en la idea del proyecto: "{idea}"
-        y las respuestas recopiladas: {json.dumps(answers, ensure_ascii=False)}
-        y metadatos: {json.dumps(metadata, ensure_ascii=False)}
-        
-        Devuelve únicamente el contenido Markdown listo para ser guardado. No utilices bloques de código Markdown (como ```markdown) para envolver tu respuesta.
-        """
-        logger.info("Generando product.md por IA...")
-        resp = model.generate_content(prod_prompt)
-        save_single_spec("product.md", resp.text)
+        GENERATION_STATUS["current_filename"] = "product.md"
+        filepath = os.path.join(specs_dir, "product.md")
+        if os.path.exists(filepath) and os.path.getsize(filepath) > 100:
+            logger.info("product.md ya existe en disco, reutilizando contenido existente.")
+            with open(filepath, "r", encoding="utf-8") as f:
+                save_single_spec("product.md", f.read())
+        else:
+            prod_prompt = f"""
+            Eres un Staff Software Architect y Product Designer.
+            Genera el contenido completo en formato Markdown para el archivo 'product.md'.
+            Debe incluir:
+            1. Visión General del Producto y Propuesta de Valor.
+            2. Objetivos de Negocio y Métricas de Éxito.
+            3. Usuarios, Actores y sus Roles detallados.
+            4. Reglas de Negocio Críticas e Inquebrantables (como validaciones lógicas obligatorias, límites de dominio, ej: stock nunca negativo, borrados lógicos obligatorios, etc. estructurados como una lista clara con ejemplos).
+            5. Casos de Uso principales e Historias clave.
+            
+            Basándote en la idea del proyecto: "{idea}"
+            y las respuestas recopiladas: {json.dumps(answers, ensure_ascii=False)}
+            y metadatos: {json.dumps(metadata, ensure_ascii=False)}
+            
+            Devuelve únicamente el contenido Markdown listo para ser guardado. No utilices bloques de código Markdown (como ```markdown) para envolver tu respuesta.
+            """
+            logger.info("Generando product.md por IA...")
+            resp = model.generate_content(prod_prompt)
+            save_single_spec("product.md", resp.text)
     except Exception as e:
         logger.error(f"Error generando product.md por IA: {str(e)}")
 
     # 2. architecture.md
     try:
-        arch_prompt = f"""
-        Eres un Arquitecto de Software experto.
-        Genera el contenido completo en formato Markdown para el archivo 'architecture.md'.
-        Debe incluir:
-        1. Pila Tecnológica Propuesta (Frontend, Backend, Base de Datos, Servidor) y su justificación.
-        2. Decisiones de Diseño Clave e Infraestructura (Conceptos de despliegue).
-        3. Estructura de Módulos del Sistema y Flujo de Datos.
-        
-        Basándote en la idea del proyecto: "{idea}"
-        y las respuestas recopiladas: {json.dumps(answers, ensure_ascii=False)}
-        y metadatos: {json.dumps(metadata, ensure_ascii=False)}
-        
-        Devuelve únicamente el contenido Markdown listo para ser guardado. No utilices bloques de código Markdown (como ```markdown) para envolver tu respuesta.
-        """
-        logger.info("Generando architecture.md por IA...")
-        resp = model.generate_content(arch_prompt)
-        save_single_spec("architecture.md", resp.text)
+        GENERATION_STATUS["current_filename"] = "architecture.md"
+        filepath = os.path.join(specs_dir, "architecture.md")
+        if os.path.exists(filepath) and os.path.getsize(filepath) > 100:
+            logger.info("architecture.md ya existe en disco, reutilizando contenido existente.")
+            with open(filepath, "r", encoding="utf-8") as f:
+                save_single_spec("architecture.md", f.read())
+        else:
+            arch_prompt = f"""
+            Eres un Arquitecto de Software experto.
+            Genera el contenido completo en formato Markdown para el archivo 'architecture.md'.
+            Debe incluir:
+            1. Pila Tecnológica Propuesta (Frontend, Backend, Base de Datos, Servidor) y su justificación.
+            2. Decisiones de Diseño Clave e Infraestructura (Conceptos de despliegue).
+            3. Estructura de Módulos del Sistema y Flujo de Datos.
+            
+            Basándote en la idea del proyecto: "{idea}"
+            y las respuestas recopiladas: {json.dumps(answers, ensure_ascii=False)}
+            y metadatos: {json.dumps(metadata, ensure_ascii=False)}
+            
+            Devuelve únicamente el contenido Markdown listo para ser guardado. No utilices bloques de código Markdown (como ```markdown) para envolver tu respuesta.
+            """
+            logger.info("Generando architecture.md por IA...")
+            resp = model.generate_content(arch_prompt)
+            save_single_spec("architecture.md", resp.text)
     except Exception as e:
         logger.error(f"Error generando architecture.md por IA: {str(e)}")
 
     # 3. database.md
     try:
-        db_prompt = f"""
-        Eres un Ingeniero de Base de Datos experto.
-        Genera el contenido completo en formato Markdown para el archivo 'database.md'.
-        Debe incluir:
-        1. Diseño Conceptual del Modelo de Datos.
-        2. Listado de Entidades principales con sus atributos (tipos de datos) y relaciones.
-        3. Esquema físico completo escrito en sintaxis Prisma DSL (un bloque de código schema.prisma completo y listo para copiar).
-        4. Índices, restricciones o consideraciones de rendimiento.
-        
-        Basándote en la idea del proyecto: "{idea}"
-        y las respuestas recopiladas: {json.dumps(answers, ensure_ascii=False)}
-        y metadatos: {json.dumps(metadata, ensure_ascii=False)}
-        
-        Devuelve únicamente el contenido Markdown listo para ser guardado. No utilices bloques de código Markdown (como ```markdown) para envolver tu respuesta.
-        """
-        logger.info("Generando database.md por IA...")
-        resp = model.generate_content(db_prompt)
-        save_single_spec("database.md", resp.text)
+        GENERATION_STATUS["current_filename"] = "database.md"
+        filepath = os.path.join(specs_dir, "database.md")
+        if os.path.exists(filepath) and os.path.getsize(filepath) > 100:
+            logger.info("database.md ya existe en disco, reutilizando contenido existente.")
+            with open(filepath, "r", encoding="utf-8") as f:
+                save_single_spec("database.md", f.read())
+        else:
+            db_prompt = f"""
+            Eres un Ingeniero de Base de Datos experto.
+            Genera el contenido completo en formato Markdown para el archivo 'database.md'.
+            Debe incluir:
+            1. Diseño Conceptual del Modelo de Datos.
+            2. Listado de Entidades principales con sus atributos (tipos de datos) y relaciones.
+            3. Esquema físico completo escrito en sintaxis Prisma DSL (un bloque de código schema.prisma completo y listo para copiar).
+            4. Índices, restricciones o consideraciones de rendimiento.
+            
+            Basándote en la idea del proyecto: "{idea}"
+            y las respuestas recopiladas: {json.dumps(answers, ensure_ascii=False)}
+            y metadatos: {json.dumps(metadata, ensure_ascii=False)}
+            
+            Devuelve únicamente el contenido Markdown listo para ser guardado. No utilices bloques de código Markdown (como ```markdown) para envolver tu respuesta.
+            """
+            logger.info("Generando database.md por IA...")
+            resp = model.generate_content(db_prompt)
+            save_single_spec("database.md", resp.text)
     except Exception as e:
         logger.error(f"Error generando database.md por IA: {str(e)}")
 
     # 4. api.md
     try:
-        api_prompt = f"""
-        Eres un Diseñador de APIs RESTful experto.
-        Genera el contenido completo en formato Markdown para el archivo 'api.md'.
-        Debe incluir:
-        1. Protocolo de Comunicación, Autenticación y Manejo de Sesiones.
-        2. Listado de Endpoints clave (Rutas, Métodos HTTP, Payloads de petición y respuesta esperados).
-        3. Estructura de errores comunes.
-        
-        Basándote en la idea del proyecto: "{idea}"
-        y las respuestas recopiladas: {json.dumps(answers, ensure_ascii=False)}
-        y metadatos: {json.dumps(metadata, ensure_ascii=False)}
-        
-        Devuelve únicamente el contenido Markdown listo para ser guardado. No utilices bloques de código Markdown (como ```markdown) para envolver tu respuesta.
-        """
-        logger.info("Generando api.md por IA...")
-        resp = model.generate_content(api_prompt)
-        save_single_spec("api.md", resp.text)
+        GENERATION_STATUS["current_filename"] = "api.md"
+        filepath = os.path.join(specs_dir, "api.md")
+        if os.path.exists(filepath) and os.path.getsize(filepath) > 100:
+            logger.info("api.md ya existe en disco, reutilizando contenido existente.")
+            with open(filepath, "r", encoding="utf-8") as f:
+                save_single_spec("api.md", f.read())
+        else:
+            api_prompt = f"""
+            Eres un Diseñador de APIs RESTful experto.
+            Genera el contenido completo en formato Markdown para el archivo 'api.md'.
+            Debe incluir:
+            1. Protocolo de Comunicación, Autenticación y Manejo de Sesiones.
+            2. Listado de Endpoints clave (Rutas, Métodos HTTP, Payloads de petición y respuesta esperados).
+            3. Estructura de errores comunes.
+            
+            Basándote en la idea del proyecto: "{idea}"
+            y las respuestas recopiladas: {json.dumps(answers, ensure_ascii=False)}
+            y metadatos: {json.dumps(metadata, ensure_ascii=False)}
+            
+            Devuelve únicamente el contenido Markdown listo para ser guardado. No utilices bloques de código Markdown (como ```markdown) para envolver tu respuesta.
+            """
+            logger.info("Generando api.md por IA...")
+            resp = model.generate_content(api_prompt)
+            save_single_spec("api.md", resp.text)
     except Exception as e:
         logger.error(f"Error generando api.md por IA: {str(e)}")
 
     # 4b. openapi.json
     try:
-        api_json_prompt = f"""
-        Eres un Diseñador de APIs RESTful experto.
-        Genera una especificación OpenAPI 3.0 completa en formato JSON para el proyecto.
-        Debe describir todos los endpoints clave (autenticación, recursos principales del dominio).
-        Asegúrate de devolver ÚNICAMENTE el código JSON válido. No utilices bloques de código Markdown (como ```json) para envolver tu respuesta.
-        
-        Basándote en la idea del proyecto: "{idea}"
-        y las respuestas recopiladas: {json.dumps(answers, ensure_ascii=False)}
-        y metadatos: {json.dumps(metadata, ensure_ascii=False)}
-        """
-        logger.info("Generando openapi.json por IA...")
-        resp = model.generate_content(api_json_prompt)
-        json_content = clean_markdown(resp.text)
-        try:
-            json.loads(json_content)
-            save_single_spec("openapi.json", json_content)
-        except Exception as json_err:
-            logger.error(f"El JSON generado para openapi.json no es válido: {str(json_err)}")
-            default_json = json.dumps({
-                "openapi": "3.0.0",
-                "info": {
-                    "title": project.get("name", "Proyecto Spec-First") + " API",
-                    "version": "1.0.0",
-                    "description": f"Especificación de API generada automáticamente para {idea}"
-                },
-                "paths": {}
-            }, indent=2)
-            save_single_spec("openapi.json", default_json)
+        GENERATION_STATUS["current_filename"] = "openapi.json"
+        filepath = os.path.join(specs_dir, "openapi.json")
+        if os.path.exists(filepath) and os.path.getsize(filepath) > 100:
+            logger.info("openapi.json ya existe en disco, reutilizando contenido existente.")
+            with open(filepath, "r", encoding="utf-8") as f:
+                save_single_spec("openapi.json", f.read())
+        else:
+            api_json_prompt = f"""
+            Eres un Diseñador de APIs RESTful experto.
+            Genera una especificación OpenAPI 3.0 completa en formato JSON para el proyecto.
+            Debe describir todos los endpoints clave (autenticación, recursos principales del dominio).
+            Asegúrate de devolver ÚNICAMENTE el código JSON válido. No utilices bloques de código Markdown (como ```json) para envolver tu respuesta.
+            
+            Basándote en la idea del proyecto: "{idea}"
+            y las respuestas recopiladas: {json.dumps(answers, ensure_ascii=False)}
+            y metadatos: {json.dumps(metadata, ensure_ascii=False)}
+            """
+            logger.info("Generando openapi.json por IA...")
+            resp = model.generate_content(api_json_prompt)
+            json_content = clean_markdown(resp.text)
+            try:
+                json.loads(json_content)
+                save_single_spec("openapi.json", json_content)
+            except Exception as json_err:
+                logger.error(f"El JSON generado para openapi.json no es válido: {str(json_err)}")
+                default_json = json.dumps({
+                    "openapi": "3.0.0",
+                    "info": {
+                        "title": project.get("name", "Proyecto Spec-First") + " API",
+                        "version": "1.0.0",
+                        "description": f"Especificación de API generada automáticamente para {idea}"
+                    },
+                    "paths": {}
+                }, indent=2)
+                save_single_spec("openapi.json", default_json)
     except Exception as e:
         logger.error(f"Error generando openapi.json por IA: {str(e)}")
 
     # 4c. glossary.md
     try:
-        glossary_prompt = f"""
-        Eres un Ingeniero de Software experto.
-        Genera el contenido completo en formato Markdown para el archivo 'glossary.md'.
-        Debe incluir un glosario de términos del dominio del proyecto, con su traducción del Español al Inglés técnico sugerido para las variables del código, base de datos y endpoints (por ejemplo: Almacén: Warehouse, Existencias: Stock, etc.), asegurando coherencia conceptual y terminológica en todo el equipo.
-        
-        Basándote en la idea del proyecto: "{idea}"
-        y las respuestas recopiladas: {json.dumps(answers, ensure_ascii=False)}
-        y metadatos: {json.dumps(metadata, ensure_ascii=False)}
-        
-        Devuelve únicamente el contenido Markdown listo para ser guardado. No utilices bloques de código Markdown (como ```markdown) para envolver tu respuesta.
-        """
-        logger.info("Generando glossary.md por IA...")
-        resp = model.generate_content(glossary_prompt)
-        save_single_spec("glossary.md", resp.text)
+        GENERATION_STATUS["current_filename"] = "glossary.md"
+        filepath = os.path.join(specs_dir, "glossary.md")
+        if os.path.exists(filepath) and os.path.getsize(filepath) > 100:
+            logger.info("glossary.md ya existe en disco, reutilizando contenido existente.")
+            with open(filepath, "r", encoding="utf-8") as f:
+                save_single_spec("glossary.md", f.read())
+        else:
+            glossary_prompt = f"""
+            Eres un Ingeniero de Software experto.
+            Genera el contenido completo en formato Markdown para el archivo 'glossary.md'.
+            Debe incluir un glosario de términos del dominio del proyecto, con su traducción del Español al Inglés técnico sugerido para las variables del código, base de datos y endpoints (por ejemplo: Almacén: Warehouse, Existencias: Stock, etc.), asegurando coherencia conceptual y terminológica en todo el equipo.
+            
+            Basándote en la idea del proyecto: "{idea}"
+            y las respuestas recopiladas: {json.dumps(answers, ensure_ascii=False)}
+            y metadatos: {json.dumps(metadata, ensure_ascii=False)}
+            
+            Devuelve únicamente el contenido Markdown listo para ser guardado. No utilices bloques de código Markdown (como ```markdown) para envolver tu respuesta.
+            """
+            logger.info("Generando glossary.md por IA...")
+            resp = model.generate_content(glossary_prompt)
+            save_single_spec("glossary.md", resp.text)
     except Exception as e:
         logger.error(f"Error generando glossary.md por IA: {str(e)}")
 
     # 4d. agents.md
     try:
-        agents_prompt = f"""
-        Eres un Staff Software Architect.
-        Genera el contenido completo en formato Markdown para el archivo 'agents.md' (Instrucciones para Agentes de Código de IA).
-        Debe incluir:
-        1. Contexto básico de la aplicación para el agente.
-        2. Estilos de codificación explícitos (ej. camelCase en TypeScript, PascalCase en clases, etc.).
-        3. Reglas Técnicas de Comportamiento Crítico (ej. usar transacciones de base de datos para modificaciones financieras/inventario, usar middleware centralizado de errores, prohibir librerías no aprobadas, etc.).
-        4. Indicación de que su fuente única de verdad (SSOT) son las especificaciones de esta carpeta.
-        
-        Basándote en la idea del proyecto: "{idea}"
-        y las respuestas recopiladas: {json.dumps(answers, ensure_ascii=False)}
-        y metadatos: {json.dumps(metadata, ensure_ascii=False)}
-        
-        Devuelve únicamente el contenido Markdown listo para ser guardado. No utilices bloques de código Markdown (como ```markdown) para envolver tu respuesta.
-        """
-        logger.info("Generando agents.md por IA...")
-        resp = model.generate_content(agents_prompt)
-        save_single_spec("agents.md", resp.text)
+        GENERATION_STATUS["current_filename"] = "agents.md"
+        filepath = os.path.join(specs_dir, "agents.md")
+        if os.path.exists(filepath) and os.path.getsize(filepath) > 100:
+            logger.info("agents.md ya existe en disco, reutilizando contenido existente.")
+            with open(filepath, "r", encoding="utf-8") as f:
+                save_single_spec("agents.md", f.read())
+        else:
+            agents_prompt = f"""
+            Eres un Staff Software Architect.
+            Genera el contenido completo en formato Markdown para el archivo 'agents.md' (Instrucciones para Agentes de Código de IA).
+            Debe incluir:
+            1. Contexto básico de la aplicación para el agente.
+            2. Estilos de codificación explícitos (ej. camelCase en TypeScript, PascalCase en clases, etc.).
+            3. Reglas Técnicas de Comportamiento Crítico (ej. usar transacciones de base de datos para modificaciones financieras/inventario, usar middleware centralizado de errores, prohibir librerías no aprobadas, etc.).
+            4. Indicación de que su fuente única de verdad (SSOT) son las especificaciones de esta carpeta.
+            
+            Basándote en la idea del proyecto: "{idea}"
+            y las respuestas recopiladas: {json.dumps(answers, ensure_ascii=False)}
+            y metadatos: {json.dumps(metadata, ensure_ascii=False)}
+            
+            Devuelve únicamente el contenido Markdown listo para ser guardado. No utilices bloques de código Markdown (como ```markdown) para envolver tu respuesta.
+            """
+            logger.info("Generando agents.md por IA...")
+            resp = model.generate_content(agents_prompt)
+            save_single_spec("agents.md", resp.text)
     except Exception as e:
         logger.error(f"Error generando agents.md por IA: {str(e)}")
         
+    actors_list = [a for a in metadata.get('actors', []) if a]
+    if not actors_list:
+        actors_list = ['Usuario']
+    primary_actor = actors_list[0]
+
     # Plantillas de fallback para los archivos
     for filename in files_to_generate:
-        filepath = os.path.join(specs_dir, filename)
+        GENERATION_STATUS["current_filename"] = filename
         content = ""
         
         # Si fue generado por la IA, lo usamos
@@ -1215,7 +1276,7 @@ async def export_specs(req: SaveProjectRequest, x_gemini_key: Optional[str] = He
  *   **Idea Semilla:** {idea}
  *   **Dominio:** {metadata.get('domain', 'No especificado')}
  *   **Tipo de Producto:** {metadata.get('productType', 'No especificado')}
- *   **Actores Detectados:** {", ".join(metadata.get('actors', []))}
+ *   **Actores Detectados:** {", ".join(actors_list)}
  
  ## Resumen de Respuestas clave
  {chr(10).join([f"*   **{k}:** {v}" for k, v in answers.items()])}
@@ -1228,7 +1289,7 @@ async def export_specs(req: SaveProjectRequest, x_gemini_key: Optional[str] = He
  
  ## Requisitos Funcionales (RF)
  A partir de la idea: *{idea}*
- *   **RF-01 (Autenticación):** El sistema debe permitir a los actores ({", ".join(metadata.get('actors', []))}) iniciar sesión de forma segura.
+ *   **RF-01 (Autenticación):** El sistema debe permitir a los actores ({", ".join(actors_list)}) iniciar sesión de forma segura.
  *   **RF-02 (Core):** El sistema debe resolver la problemática central: "{idea}".
  *   **RF-03 (Administración):** Se debe proveer un panel de control para gestionar recursos.
  
@@ -1241,7 +1302,7 @@ async def export_specs(req: SaveProjectRequest, x_gemini_key: Optional[str] = He
                 content = f"""# Historias de Usuario (Specs)
  
  ## Historia 1: Acceso al Sistema
- **Como** {metadata.get('actors', ['Usuario'])[0]}  
+ **Como** {primary_actor}  
  **Quiero** ingresar con mis credenciales al sistema  
  **Para** poder acceder a mis recursos privados.
  
@@ -1249,7 +1310,7 @@ async def export_specs(req: SaveProjectRequest, x_gemini_key: Optional[str] = He
  *   **Criterio de Aceptación 2:** Dado un usuario registrado, cuando ingresa credenciales válidas, es redirigido al panel de control.
  
  ## Historia 2: Ejecución del Core
- **Como** {metadata.get('actors', ['Usuario'])[0]}  
+ **Como** {primary_actor}  
  **Quiero** interactuar con la funcionalidad principal del software  
  **Para** resolver mi necesidad de negocio.
  """
@@ -1277,7 +1338,7 @@ async def export_specs(req: SaveProjectRequest, x_gemini_key: Optional[str] = He
                 content = f"""# Políticas de Seguridad y Roles
  
  ## Matriz de Control de Acceso (RBAC)
- *   **Roles:** {", ".join(metadata.get('actors', ['Usuario']))}
+ *   **Roles:** {", ".join(actors_list)}
  *   **Políticas:**
      *   Cada rol tiene permisos limitados a sus propios recursos.
      *   Los administradores pueden gestionar todos los recursos.
@@ -1351,13 +1412,7 @@ async def export_specs(req: SaveProjectRequest, x_gemini_key: Optional[str] = He
             else:
                 content = f"# Especificación: {filename.replace('.md', '').replace('.json', '').capitalize()}\n\nContenido pendiente de refinamiento por el usuario."
         
-        try:
-            with open(filepath, "w", encoding="utf-8") as f:
-                f.write(content.strip())
-            generated_files.append(filename)
-            project["specModules"][filename.replace(".md", "").replace(".json", "")] = content.strip()
-        except Exception as e:
-            logger.error(f"Error escribiendo el archivo {filename}: {str(e)}")
+        save_single_spec(filename, content)
             
     # Guardar el proyecto con los specModules cargados en project.json
     try:

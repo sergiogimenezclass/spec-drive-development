@@ -742,6 +742,11 @@ function setupEventListeners() {
     }
 
     if (copilotInput) {
+        copilotInput.addEventListener('input', () => {
+            copilotInput.style.height = 'auto';
+            copilotInput.style.height = Math.min(copilotInput.scrollHeight, 140) + 'px';
+        });
+
         copilotInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
@@ -963,12 +968,15 @@ async function startDiscoveryFlow() {
             try {
                 const exportResponse = await fetch('/api/export-specs', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Gemini-Key': state.apiKey
-                    },
+                    headers: getAiHeaders(),
                     body: JSON.stringify({ project_data: state.currentProject })
                 });
+                
+                const isQuota = await checkResponseForQuotaError(exportResponse, startDiscoveryFlow);
+                if (isQuota) {
+                    stopPollingGenerationStatus();
+                    return;
+                }
                 
                 const exportData = await exportResponse.json();
                 stopPollingGenerationStatus();
@@ -983,7 +991,7 @@ async function startDiscoveryFlow() {
                     showToast("Especificaciones generadas directamente con éxito", "success");
                     loadWorkspace();
                 } else {
-                    throw new Error("La generación de especificaciones no devolvió éxito.");
+                    throw new Error(exportData.detail || "La generación de especificaciones no devolvió éxito.");
                 }
             } catch (exportErr) {
                 stopPollingGenerationStatus();
@@ -1332,13 +1340,16 @@ async function finishInterviewAndGenerateSpecs() {
     try {
         const exportResponse = await fetch('/api/export-specs', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Gemini-Key': state.apiKey
-            },
+            headers: getAiHeaders(),
             body: JSON.stringify({ project_data: state.currentProject })
         });
         
+        const isQuota = await checkResponseForQuotaError(exportResponse, finishInterviewAndGenerateSpecs);
+        if (isQuota) {
+            stopPollingGenerationStatus();
+            return;
+        }
+
         const exportData = await exportResponse.json();
         stopPollingGenerationStatus();
 
@@ -1352,7 +1363,7 @@ async function finishInterviewAndGenerateSpecs() {
             showToast("Especificaciones redactadas con éxito basándose en tu entrevista", "success");
             loadWorkspace();
         } else {
-            showToast("Hubo un error al generar las especificaciones, ingresando al Workspace.", "error");
+            showToast(exportData.detail || "Hubo un error al generar las especificaciones, ingresando al Workspace.", "error");
             loadWorkspace();
         }
     } catch (e) {
@@ -2077,7 +2088,10 @@ async function sendCopilotMessage(queryText) {
     const text = queryText || (inputEl ? inputEl.value.trim() : '');
     if (!text) return;
 
-    if (inputEl) inputEl.value = '';
+    if (inputEl) {
+        inputEl.value = '';
+        inputEl.style.height = 'auto';
+    }
 
     const container = document.getElementById('copilot-messages');
     if (!container) return;
