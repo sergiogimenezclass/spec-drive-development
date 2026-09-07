@@ -177,9 +177,19 @@
 
                     <!-- Tarjeta de proyectos recientes -->
                     <div class="glass-card recent-projects-card">
-                        <div class="card-header">
-                            <i class="fa-solid fa-folder-open folder-icon"></i>
-                            <h2>Proyecto en Curso</h2>
+                        <div class="card-header" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <i class="fa-solid fa-folder-open folder-icon"></i>
+                                <h2>Proyectos Recientes y en Curso</h2>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <button type="button" id="btn-open-existing-folder" class="btn btn-secondary btn-sm" style="font-size: 11px; padding: 5px 12px; display: flex; align-items: center; gap: 6px;" title="Seleccionar y abrir cualquier carpeta de proyecto guardada en tu disco">
+                                    <i class="fa-solid fa-folder-open" style="color: var(--accent);"></i> Abrir Proyecto desde Carpeta
+                                </button>
+                                <button type="button" id="btn-rescan-projects" class="btn btn-border btn-sm" style="font-size: 11px; padding: 5px 12px; display: flex; align-items: center; gap: 6px;" title="Buscar e indexar todos los proyectos presentes en disco">
+                                    <i class="fa-solid fa-rotate" style="color: var(--primary-hover);"></i> Re-escanear Disco
+                                </button>
+                            </div>
                         </div>
                         <div class="card-body" id="recent-projects-list">
                             <!-- Estado vacío o proyecto actual cargado de project.json -->
@@ -609,9 +619,58 @@
         </div>
     </div>
 
+    <!-- Modal de Confirmación de Eliminación de Proyecto -->
+    <div id="delete-project-modal" class="modal-overlay" style="display: none;">
+        <div class="delete-modal-card">
+            <div class="delete-modal-header">
+                <div class="delete-modal-title">
+                    <div class="delete-modal-icon-badge">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                    </div>
+                    <h3>Eliminar Proyecto</h3>
+                </div>
+                <button type="button" id="btn-close-delete-modal" class="modal-close-btn" title="Cerrar modal">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="delete-modal-body">
+                <p class="delete-modal-text">
+                    ¿Qué acción deseas realizar con el proyecto <strong id="delete-modal-project-name"></strong>?
+                </p>
+                <div class="delete-modal-path-box">
+                    <i class="fa-solid fa-folder-closed"></i>
+                    <span id="delete-modal-project-path"></span>
+                </div>
+
+                <div class="delete-options-group">
+                    <label class="delete-option-card selected-soft" id="opt-card-registry">
+                        <input type="radio" name="delete-mode" value="registry" checked id="radio-del-registry">
+                        <div>
+                            <span class="delete-option-title">Quitar solo de la lista</span>
+                            <span class="delete-option-desc">Remueve la tarjeta del dashboard y de la base de datos. Conserva la carpeta y tus archivos intactos en el disco duro.</span>
+                        </div>
+                    </label>
+                    <label class="delete-option-card option-danger" id="opt-card-disk">
+                        <input type="radio" name="delete-mode" value="disk" id="radio-del-disk">
+                        <div>
+                            <span class="delete-option-title" style="color: var(--danger);">Borrar carpeta y archivos del disco</span>
+                            <span class="delete-option-desc">Elimina permanentemente la carpeta física y todas sus especificaciones del disco duro. Esta acción no se puede deshacer.</span>
+                        </div>
+                    </label>
+                </div>
+            </div>
+            <div class="delete-modal-footer">
+                <button type="button" id="btn-cancel-delete-modal" class="btn btn-border btn-sm">Cancelar</button>
+                <button type="button" id="btn-confirm-delete-modal" class="btn-confirm-delete">
+                    <i class="fa-solid fa-trash-can"></i> Confirmar Eliminación
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Notificaciones flotantes -->
     <div id="toast-container" class="toast-container"></div>
 
-    <script src="app.js?v=2.4.0"></script>
+    <script src="app.js?v=3.5.0"></script>
 </body>
 </html>

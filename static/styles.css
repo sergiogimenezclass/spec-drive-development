@@ -2042,3 +2042,189 @@ select option {
     color: #ffffff;
     font-weight: 700;
 }
+
+/* ==========================================================================
+   DELETE PROJECT MODAL - STYLING ALINEADO AL SISTEMA DE DISEÑO
+   ========================================================================== */
+.delete-modal-card {
+    background: var(--bg-surface-solid) !important;
+    border: 1px solid var(--border-color) !important;
+    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.5) !important;
+    border-radius: var(--radius-lg);
+    width: 92%;
+    max-width: 520px;
+    padding: 0;
+    overflow: hidden;
+    animation: modalSlideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.delete-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 24px;
+    background: rgba(255, 23, 68, 0.06);
+    border-bottom: 1px solid rgba(255, 23, 68, 0.15);
+}
+
+.delete-modal-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.delete-modal-icon-badge {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    background: rgba(255, 23, 68, 0.12);
+    border: 1px solid rgba(255, 23, 68, 0.25);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--danger);
+    font-size: 16px;
+}
+
+.delete-modal-title h3 {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--text-primary);
+    font-family: var(--font-title);
+}
+
+.delete-modal-body {
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.delete-modal-text {
+    font-size: 14px;
+    color: var(--text-primary);
+    line-height: 1.5;
+    margin: 0;
+}
+
+.delete-modal-path-box {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--primary-hover);
+    background: var(--bg-surface-hover);
+    border: 1px solid var(--border-color);
+    padding: 10px 14px;
+    border-radius: var(--radius-md);
+    word-break: break-all;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.delete-options-group {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 4px;
+}
+
+.delete-option-card {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 16px;
+    border: 1.5px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: var(--bg-surface-solid);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.delete-option-card:hover {
+    border-color: var(--primary);
+    background: var(--bg-surface-hover);
+}
+
+.delete-option-card.selected-soft {
+    border-color: var(--primary);
+    background: rgba(123, 97, 255, 0.08);
+}
+
+.delete-option-card.selected-danger {
+    border-color: var(--danger);
+    background: rgba(255, 23, 68, 0.08);
+}
+
+.delete-option-card input[type="radio"] {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 18px;
+    height: 18px;
+    border: 2px solid var(--text-muted);
+    border-radius: 50%;
+    outline: none;
+    margin-top: 2px;
+    flex-shrink: 0;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.delete-option-card input[type="radio"]:checked {
+    border-color: var(--primary);
+    background-color: var(--primary);
+    box-shadow: inset 0 0 0 3px var(--bg-surface-solid);
+}
+
+.delete-option-card.option-danger input[type="radio"]:checked {
+    border-color: var(--danger);
+    background-color: var(--danger);
+    box-shadow: inset 0 0 0 3px var(--bg-surface-solid);
+}
+
+.delete-option-title {
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--text-primary);
+    display: block;
+    margin-bottom: 3px;
+}
+
+.delete-option-desc {
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.4;
+    display: block;
+}
+
+.delete-modal-footer {
+    padding: 16px 24px;
+    background: var(--bg-surface-hover);
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+}
+
+.btn-confirm-delete {
+    background: linear-gradient(135deg, #ff1744 0%, #d50000 100%) !important;
+    color: #ffffff !important;
+    border: none !important;
+    font-weight: 700 !important;
+    font-size: 13px !important;
+    padding: 9px 20px !important;
+    border-radius: var(--radius-md) !important;
+    box-shadow: 0 4px 14px rgba(255, 23, 68, 0.35) !important;
+    cursor: pointer !important;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.btn-confirm-delete:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(255, 23, 68, 0.5) !important;
+}

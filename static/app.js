@@ -403,6 +403,19 @@ function setupTheme() {
     }
 }
 
+// Actualizar la lista de proyectos recientes desde el servidor
+async function refreshRecentProjects() {
+    try {
+        const recentResp = await fetch('/api/recent-projects');
+        const recentData = await recentResp.json();
+        const projectsList = (recentData.status === 'success' && recentData.projects) ? recentData.projects : [];
+        renderRecentProjectsList(projectsList);
+    } catch (e) {
+        console.error("Error al actualizar proyectos recientes:", e);
+        renderRecentProjectsList([]);
+    }
+}
+
 // Comprobar si hay un proyecto activo y obtener la lista de recientes
 async function checkExistingProject() {
     try {
@@ -414,93 +427,297 @@ async function checkExistingProject() {
         const activeData = await activeResp.json();
         const recentData = await recentResp.json();
 
-        if (activeData.status === 'success' && activeData.project) {
-            state.currentProject = activeData.project;
-            const hasSpecs = state.currentProject.specModules && Object.keys(state.currentProject.specModules).length > 0;
-            if (hasSpecs && !window.location.hash.includes('dashboard')) {
-                loadWorkspace();
-            }
-        }
-
         const projectsList = (recentData.status === 'success' && recentData.projects) ? recentData.projects : [];
         renderRecentProjectsList(projectsList);
+
+        if (activeData.status === 'success' && activeData.project) {
+            state.currentProject = activeData.project;
+            if (window.location.hash === '#workspace') {
+                loadWorkspace();
+            } else {
+                showScreen('screen-dashboard');
+            }
+        } else {
+            showScreen('screen-dashboard');
+        }
     } catch (e) {
         console.error("Error cargando proyecto y recientes:", e);
         renderRecentProjectsList([]);
+        showScreen('screen-dashboard');
     }
 }
 
-// Mostrar listado de proyectos recientes en el Dashboard
+// Función auxiliar para sanitizar cadenas HTML y evitar errores en plantillas DOM
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+// Abrir un proyecto dada su ruta absoluta en disco
+async function openProjectFromPath(targetPath) {
+    if (!targetPath) return;
+    try {
+        showToast("Estableciendo ruta del proyecto...", "info");
+        const setResp = await fetch('/api/set-project-path', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ project_path: targetPath })
+        });
+        const setData = await setResp.json();
+
+        if (setData.status === 'success') {
+            const loadResp = await fetch('/api/load-project');
+            const loadData = await loadResp.json();
+            if (loadData.status === 'success' && loadData.project) {
+                state.currentProject = loadData.project;
+            } else {
+                const folderName = targetPath.split('/').filter(Boolean).pop() || 'Proyecto';
+                state.currentProject = {
+                    id: 'proj_' + Date.now(),
+                    name: folderName.replace(/-/g, ' ').replace(/_/g, ' '),
+                    seedIdea: '',
+                    answers: {},
+                    specModules: {},
+                    featuresList: []
+                };
+            }
+            refreshRecentProjects();
+            showToast(`Proyecto "${state.currentProject.name || 'Cargado'}" abierto con éxito.`, "success");
+            loadWorkspace();
+        } else {
+            showToast(setData.message || "No se pudo abrir la carpeta del proyecto.", "error");
+        }
+    } catch (err) {
+        console.error("Error abriendo carpeta de proyecto:", err);
+        showToast("Error de comunicación al abrir el proyecto.", "error");
+    }
+}
+
+// Iniciar diálogo para seleccionar y abrir carpeta existente de proyecto
+async function openExistingProjectFolder() {
+    try {
+        showToast("Abriendo selector de carpetas del sistema...", "info");
+        const resp = await fetch('/api/select-folder-dialog', { method: 'POST' });
+        const data = await resp.json();
+
+        if (data.status === 'success' && data.selected_path) {
+            await openProjectFromPath(data.selected_path);
+        } else if (data.status === 'manual_required') {
+            const manualPath = prompt("Introduce la ruta absoluta de la carpeta del proyecto:", data.current_path || "/home/sergio/Documents/src/programador 2026/spect-first");
+            if (manualPath && manualPath.trim()) {
+                await openProjectFromPath(manualPath.trim());
+            }
+        } else if (data.status === 'cancelled') {
+            showToast("Selección de carpeta cancelada", "info");
+        } else {
+            showToast(data.message || "No se pudo seleccionar la carpeta.", "warning");
+        }
+    } catch (err) {
+        console.error("Error abriendo diálogo de selección:", err);
+        const manualPath = prompt("Introduce la ruta absoluta de la carpeta del proyecto:");
+        if (manualPath && manualPath.trim()) {
+            await openProjectFromPath(manualPath.trim());
+        }
+    }
+}
+
+// Variables para el modal de eliminación
+let pendingDeletePath = '';
+let pendingDeleteName = '';
+
+function updateDeleteModalOptionCards() {
+    const radioRegistry = document.getElementById('radio-del-registry');
+    const radioDisk = document.getElementById('radio-del-disk');
+    const cardRegistry = document.getElementById('opt-card-registry');
+    const cardDisk = document.getElementById('opt-card-disk');
+
+    if (cardRegistry && cardDisk) {
+        if (radioRegistry && radioRegistry.checked) {
+            cardRegistry.classList.add('selected-soft');
+            cardDisk.classList.remove('selected-danger');
+        } else if (radioDisk && radioDisk.checked) {
+            cardDisk.classList.add('selected-danger');
+            cardRegistry.classList.remove('selected-soft');
+        }
+    }
+}
+
+function openDeleteModal(targetPath, targetName) {
+    pendingDeletePath = targetPath;
+    pendingDeleteName = targetName;
+    
+    const nameEl = document.getElementById('delete-modal-project-name');
+    const pathEl = document.getElementById('delete-modal-project-path');
+    const modal = document.getElementById('delete-project-modal');
+    const radioRegistry = document.getElementById('radio-del-registry');
+
+    if (radioRegistry) radioRegistry.checked = true;
+    updateDeleteModalOptionCards();
+
+    if (nameEl) nameEl.textContent = targetName || 'Sin título';
+    if (pathEl) pathEl.textContent = targetPath || '';
+    if (modal) modal.style.display = 'flex';
+}
+
+function closeDeleteModal() {
+    const modal = document.getElementById('delete-project-modal');
+    if (modal) modal.style.display = 'none';
+    pendingDeletePath = '';
+    pendingDeleteName = '';
+}
+
+// Eliminar proyecto (del registro o del disco)
+async function deleteProject(targetPath, deleteFiles = false) {
+    if (!targetPath) return;
+    try {
+        showToast("Procesando eliminación...", "info");
+        const resp = await fetch('/api/delete-project', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ project_path: targetPath, delete_files: deleteFiles })
+        });
+        const data = await resp.json();
+        if (data.status === 'success' && data.projects) {
+            renderRecentProjectsList(data.projects);
+            showToast(data.message || "Proyecto eliminado.", "success");
+        } else {
+            showToast(data.message || "Error al eliminar proyecto.", "error");
+        }
+    } catch (err) {
+        console.error("Error al eliminar proyecto:", err);
+        showToast("Error de comunicación al eliminar el proyecto.", "error");
+    } finally {
+        closeDeleteModal();
+    }
+}
+
+// Mostrar listado de proyectos recientes en el Dashboard con separación clara entre el activo y los demás
 function renderRecentProjectsList(projects) {
     const container = document.getElementById('recent-projects-list');
     if (!container) return;
 
-    if (!projects || projects.length === 0) {
+    if (!projects || !Array.isArray(projects) || projects.length === 0) {
         container.innerHTML = `
             <div class="empty-projects-state">
                 <i class="fa-solid fa-diagram-project"></i>
-                <p>No hay proyectos activos cargados. <br>Inicia uno nuevo para comenzar.</p>
+                <p>No hay proyectos activos cargados. <br>Inicia uno nuevo o abre una carpeta de proyecto existente.</p>
             </div>
         `;
         return;
     }
 
-    container.innerHTML = projects.map(proj => {
-        const dateStr = new Date(proj.updatedAt || Date.now()).toLocaleDateString('es-ES', {
-            day: '2-digit',
-            month: 'short',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-        const activeBadge = proj.isActive 
-            ? `<span class="badge" style="background: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.4); font-size: 10px; padding: 2px 6px;">En Uso</span>`
-            : '';
-        const ideaShort = proj.seedIdea ? (proj.seedIdea.length > 85 ? proj.seedIdea.substring(0, 82) + '...' : proj.seedIdea) : '';
+    const activeProject = projects.find(p => p.isActive);
+    const otherProjects = projects.filter(p => !p.isActive);
 
-        return `
-            <div class="recent-project-item ${proj.isActive ? 'active-project-card' : ''}" data-path="${proj.path}" style="margin-bottom: 10px; padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer;">
-                <div class="project-item-info" style="flex: 1; min-width: 0;">
-                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 3px;">
-                        <span class="project-item-title" style="font-weight: 700; font-size: 15px; color: var(--text-primary);">${proj.name}</span>
-                        ${activeBadge}
-                    </div>
-                    ${ideaShort ? `<div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${ideaShort}</div>` : ''}
-                    <div style="font-size: 11px; color: var(--text-muted); font-family: monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                        <i class="fa-solid fa-folder-closed" style="margin-right: 4px;"></i>${proj.path}
-                    </div>
+    let html = '';
+
+    // 1. Tarjeta Destacada: Proyecto Activo Actual
+    if (activeProject) {
+        const cleanName = escapeHtml(activeProject.name || 'Sin título');
+        const cleanPath = escapeHtml(activeProject.path || '');
+        const cleanIdea = activeProject.seedIdea ? escapeHtml(activeProject.seedIdea.length > 90 ? activeProject.seedIdea.substring(0, 87) + '...' : activeProject.seedIdea) : '';
+
+        html += `
+            <div style="margin-bottom: 20px;">
+                <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #10b981; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+                    <i class="fa-solid fa-circle" style="font-size: 7px;"></i> Proyecto Actualmente Activo en el IDE
                 </div>
-                <div class="project-item-action">
-                    <button type="button" class="btn btn-sm ${proj.isActive ? 'btn-primary' : 'btn-border'}" style="pointer-events: none; white-space: nowrap; font-size: 12px; font-weight: 600;">
-                        ${proj.isActive ? '<i class="fa-solid fa-folder-open"></i> En uso' : '<i class="fa-solid fa-arrow-right"></i> Abrir'}
-                    </button>
+                <div class="recent-project-item active-project-card" data-path="${cleanPath}" style="padding: 16px 18px; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 12px; display: flex; align-items: center; justify-content: space-between; gap: 14px;">
+                    <div class="project-item-info" style="flex: 1; min-width: 0; cursor: pointer;">
+                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                            <span class="project-item-title" style="font-weight: 800; font-size: 16px; color: var(--text-primary);">${cleanName}</span>
+                            <span class="badge" style="background: #10b981; color: #000; font-weight: 700; font-size: 10px; padding: 2px 7px; border-radius: 4px;">EN USO</span>
+                        </div>
+                        ${cleanIdea ? `<div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${cleanIdea}</div>` : ''}
+                        <div style="font-size: 11px; color: var(--text-muted); font-family: monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                            <i class="fa-solid fa-folder-open" style="margin-right: 5px; color: #10b981;"></i>${cleanPath}
+                        </div>
+                    </div>
+                    <div class="project-item-action" style="display: flex; align-items: center; gap: 8px;">
+                        <button type="button" class="btn btn-sm btn-primary btn-open-project" style="white-space: nowrap; font-size: 13px; font-weight: 700; padding: 8px 16px;">
+                            <i class="fa-solid fa-arrow-right-to-bracket"></i> Continuar Editando
+                        </button>
+                    </div>
                 </div>
             </div>
         `;
-    }).join('');
+    }
 
+    // 2. Sección: Otros Proyectos en Disco
+    if (otherProjects.length > 0) {
+        html += `
+            <div>
+                <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+                    <i class="fa-solid fa-folder-tree"></i> Otros Proyectos Guardados en tu Disco (${otherProjects.length})
+                </div>
+                <div class="other-projects-grid" style="display: flex; flex-direction: column; gap: 8px;">
+        `;
+
+        html += otherProjects.map(proj => {
+            const cleanName = escapeHtml(proj.name || 'Sin título');
+            const cleanPath = escapeHtml(proj.path || '');
+            const cleanIdea = proj.seedIdea ? escapeHtml(proj.seedIdea.length > 85 ? proj.seedIdea.substring(0, 82) + '...' : proj.seedIdea) : '';
+
+            return `
+                <div class="recent-project-item" data-path="${cleanPath}" style="padding: 12px 16px; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 10px; display: flex; align-items: center; justify-content: space-between; gap: 12px; transition: border-color 0.2s;">
+                    <div class="project-item-info" style="flex: 1; min-width: 0; cursor: pointer;">
+                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 3px;">
+                            <span class="project-item-title" style="font-weight: 700; font-size: 14px; color: var(--text-primary);">${cleanName}</span>
+                        </div>
+                        ${cleanIdea ? `<div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${cleanIdea}</div>` : ''}
+                        <div style="font-size: 11px; color: var(--text-muted); font-family: monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                            <i class="fa-solid fa-folder-closed" style="margin-right: 4px;"></i>${cleanPath}
+                        </div>
+                    </div>
+                    <div class="project-item-action" style="display: flex; align-items: center; gap: 8px;">
+                        <button type="button" class="btn btn-sm btn-border btn-open-project" style="white-space: nowrap; font-size: 12px; font-weight: 600; padding: 6px 12px;">
+                            <i class="fa-solid fa-folder-open" style="color: var(--accent);"></i> Cargar Proyecto
+                        </button>
+                        <button type="button" class="btn-delete-project btn btn-sm" data-path="${cleanPath}" data-name="${cleanName}" title="Eliminar proyecto de la lista o borrar carpeta" style="padding: 6px 10px; color: #ef4444; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.25); border-radius: var(--radius-md); cursor: pointer; font-size: 12px;">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        html += `
+                </div>
+            </div>
+        `;
+    }
+
+    container.innerHTML = html;
+
+    // Manejador para abrir proyectos
     container.querySelectorAll('.recent-project-item').forEach(item => {
-        item.addEventListener('click', async () => {
-            const targetPath = item.getAttribute('data-path');
+        const infoArea = item.querySelector('.project-item-info');
+        const openBtn = item.querySelector('.btn-open-project');
+        const targetPath = item.getAttribute('data-path');
+
+        const handleOpen = async () => {
             if (targetPath) {
-                try {
-                    await fetch('/api/set-project-path', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ project_path: targetPath })
-                    });
-                    
-                    const loadResp = await fetch('/api/load-project');
-                    const loadData = await loadResp.json();
-                    if (loadData.status === 'success' && loadData.project) {
-                        state.currentProject = loadData.project;
-                    }
-                    showToast(`Cargando proyecto "${state.currentProject.name}"`, "info");
-                    loadWorkspace();
-                } catch (err) {
-                    console.error("Error cambiando a proyecto:", err);
-                    showToast("No se pudo cargar el proyecto seleccionado.", "error");
-                }
+                await openProjectFromPath(targetPath);
+            }
+        };
+
+        if (infoArea) infoArea.addEventListener('click', handleOpen);
+        if (openBtn) openBtn.addEventListener('click', handleOpen);
+    });
+
+    // Manejador para el botón de eliminación mediante Modal Custom
+    container.querySelectorAll('.btn-delete-project').forEach(delBtn => {
+        delBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const targetPath = delBtn.getAttribute('data-path');
+            const targetName = delBtn.getAttribute('data-name');
+            if (targetPath) {
+                openDeleteModal(targetPath, targetName);
             }
         });
     });
@@ -508,6 +725,55 @@ function renderRecentProjectsList(projects) {
 
 // Configurar los manejadores de eventos
 function setupEventListeners() {
+    // Eventos para el Modal de Eliminación de Proyecto
+    document.getElementById('btn-close-delete-modal')?.addEventListener('click', closeDeleteModal);
+    document.getElementById('btn-cancel-delete-modal')?.addEventListener('click', closeDeleteModal);
+    document.querySelectorAll('input[name="delete-mode"]').forEach(radio => {
+        radio.addEventListener('change', updateDeleteModalOptionCards);
+    });
+    document.getElementById('btn-confirm-delete-modal')?.addEventListener('click', async () => {
+        if (!pendingDeletePath) return;
+        const selectedRadio = document.querySelector('input[name="delete-mode"]:checked');
+        const deleteDisk = selectedRadio ? (selectedRadio.value === 'disk') : false;
+        await deleteProject(pendingDeletePath, deleteDisk);
+    });
+
+    // Abrir proyecto desde carpeta existente en disco
+    const openFolderBtn = document.getElementById('btn-open-existing-folder');
+    if (openFolderBtn) {
+        openFolderBtn.addEventListener('click', openExistingProjectFolder);
+    }
+
+    // Re-escanear proyectos en disco
+    const rescanBtn = document.getElementById('btn-rescan-projects');
+    if (rescanBtn) {
+        rescanBtn.addEventListener('click', async () => {
+            try {
+                showToast("Escaneando e indexando disco...", "info");
+                rescanBtn.disabled = true;
+                const icon = rescanBtn.querySelector('i');
+                if (icon) icon.classList.add('fa-spin');
+
+                const resp = await fetch('/api/rescan-projects', { method: 'POST' });
+                const data = await resp.json();
+                
+                if (data.status === 'success' && data.projects) {
+                    renderRecentProjectsList(data.projects);
+                    showToast(data.message || `Proyectos indexados: ${data.projects.length}`, "success");
+                } else {
+                    showToast("No se pudieron re-escanear los proyectos.", "warning");
+                }
+            } catch (err) {
+                console.error("Error re-escaneando proyectos:", err);
+                showToast("Error de comunicación al re-escanear disco.", "error");
+            } finally {
+                rescanBtn.disabled = false;
+                const icon = rescanBtn.querySelector('i');
+                if (icon) icon.classList.remove('fa-spin');
+            }
+        });
+    }
+
     // Alternar Tema
     document.getElementById('theme-toggle-btn').addEventListener('click', () => {
         state.isDarkTheme = !state.isDarkTheme;
@@ -976,11 +1242,14 @@ function showScreen(screenId) {
     if (screenId === 'screen-workspace') {
         headerIndicator.classList.remove('hidden');
         globalProgress.classList.remove('hidden');
-        document.getElementById('current-project-name').innerText = state.currentProject.name;
+        document.getElementById('current-project-name').innerText = state.currentProject ? state.currentProject.name : 'Mi Proyecto';
         updateGlobalProgressBar();
     } else {
         headerIndicator.classList.add('hidden');
         globalProgress.classList.add('hidden');
+        if (screenId === 'screen-dashboard') {
+            refreshRecentProjects();
+        }
     }
 }
 
@@ -2227,22 +2496,32 @@ async function loadCopilotHistory() {
     try {
         const resp = await fetch('/api/copilot-history');
         const data = await resp.json();
-        if (data.status === 'success' && data.history && data.history.length > 0) {
-            state.copilotHistory = data.history;
-            const container = document.getElementById('copilot-messages');
-            if (container) {
-                container.innerHTML = '';
-                data.history.forEach(msg => {
+        const historyList = (data.status === 'success' && Array.isArray(data.history)) ? data.history : [];
+        
+        state.copilotHistory = historyList;
+        const container = document.getElementById('copilot-messages');
+        if (container) {
+            container.innerHTML = '';
+            if (historyList.length === 0) {
+                container.innerHTML = '<div class="copilot-msg msg-ai">' +
+                    '<div class="msg-avatar"><i class="fa-solid fa-robot"></i></div>' +
+                    '<div class="msg-body">' +
+                        '<p>¡Hola! Soy <strong>Spec Copilot</strong>. Estoy listo para ayudarte con las especificaciones de este proyecto.</p>' +
+                    '</div>' +
+                '</div>';
+            } else {
+                historyList.forEach(msg => {
                     const role = (msg.role === 'user') ? 'user' : 'ai';
                     appendCopilotMsg(role, msg.content, false);
                 });
-                setTimeout(() => {
-                    container.scrollTop = container.scrollHeight;
-                }, 60);
             }
+            setTimeout(() => {
+                container.scrollTop = container.scrollHeight;
+            }, 60);
         }
     } catch (e) {
         console.error("Error cargando historial de chat:", e);
+        state.copilotHistory = [];
     }
 }
 
@@ -2255,13 +2534,15 @@ async function clearCopilotChat() {
     }
     const container = document.getElementById('copilot-messages');
     if (container) {
-        container.innerHTML = `
-            <div class="copilot-msg msg-ai">
-                <div class="msg-avatar"><i class="fa-solid fa-robot"></i></div>
-                <div class="msg-body">
-                    <p>Conversación reiniciada. ¿En qué más puedo ayudarte sobre las especificaciones del proyecto?</p>
-                </div>
-            </div>
+        container.innerHTML = '<div class="copilot-msg msg-ai">' +
+            '<div class="msg-avatar"><i class="fa-solid fa-robot"></i></div>' +
+            '<div class="msg-body">' +
+                '<p>Conversación reiniciada. ¿En qué más puedo ayudarte sobre las especificaciones del proyecto?</p>' +
+            '</div>' +
+        '</div>';
+    }
+}
+
 async function sendCopilotMessage(text) {
     if (!text || !text.trim()) return;
 
@@ -2294,12 +2575,12 @@ async function sendCopilotMessage(text) {
         const isQuota = await checkResponseForQuotaError(resp, () => sendCopilotMessage(text));
         if (isQuota) {
             removeCopilotTyping(typingId);
-            appendCopilotMsg('ai', `⚠️ Límite de cuota (429/Rate Limit) alcanzado. Puedes ingresar una clave de resguardo o cambiar de modelo en el pop-up.`);
+            appendCopilotMsg('ai', '⚠️ Límite de cuota (429/Rate Limit) alcanzado. Puedes ingresar una clave de resguardo o cambiar de modelo en el pop-up.');
             return;
         }
 
         if (!resp.ok || !resp.body) {
-            throw new Error(`Error de comunicación con el servidor: HTTP ${resp.status}`);
+            throw new Error('Error de comunicación con el servidor: HTTP ' + resp.status);
         }
 
         removeCopilotTyping(typingId);
@@ -2307,10 +2588,7 @@ async function sendCopilotMessage(text) {
         // Crear elemento de mensaje IA para streaming progresivo (efecto máquina de escribir)
         const msgDiv = document.createElement('div');
         msgDiv.className = 'copilot-msg msg-ai';
-        msgDiv.innerHTML = `
-            <div class="msg-avatar"><i class="fa-solid fa-robot"></i></div>
-            <div class="msg-body"></div>
-        `;
+        msgDiv.innerHTML = '<div class="msg-avatar"><i class="fa-solid fa-robot"></i></div><div class="msg-body"></div>';
         container.appendChild(msgDiv);
         const msgBody = msgDiv.querySelector('.msg-body');
 
@@ -2337,7 +2615,7 @@ async function sendCopilotMessage(text) {
 
                         const tagResult = parseFeatureTag(fullText);
                         const cleanText = tagResult ? fullText.replace(tagResult.fullMatch, '').trim() : fullText;
-                        const parsedHTML = (typeof marked !== 'undefined' && marked.parse) ? marked.parse(cleanText) : `<p>${cleanText}</p>`;
+                        const parsedHTML = (typeof marked !== 'undefined' && marked.parse) ? marked.parse(cleanText) : ('<p>' + cleanText + '</p>');
                         msgBody.innerHTML = parsedHTML;
                         container.scrollTop = container.scrollHeight;
                     } else if (payload.type === 'done') {
@@ -2345,7 +2623,7 @@ async function sendCopilotMessage(text) {
                             state.copilotHistory = payload.history;
                         }
                     } else if (payload.type === 'error') {
-                        msgBody.innerHTML += `<p style="color:var(--danger)">⚠️ Error: ${payload.message}</p>`;
+                        msgBody.innerHTML += '<p style="color:var(--danger)">⚠️ Error: ' + payload.message + '</p>';
                     }
                 } catch (e) {
                     console.error("Error procesando chunk de streaming:", e);
@@ -2359,23 +2637,24 @@ async function sendCopilotMessage(text) {
             const featData = tagResult.data;
             const featName = featData.name;
             const featFolder = featData.folder || 'modulos';
-            const featDesc = featData.description || `Especificación técnica para ${featName}`;
+            const featDesc = featData.description || 'Especificación técnica para ' + featName;
             const cleanText = fullText.replace(tagResult.fullMatch, '').trim();
-            const parsedHTML = (typeof marked !== 'undefined' && marked.parse) ? marked.parse(cleanText) : `<p>${cleanText}</p>`;
+            const parsedHTML = (typeof marked !== 'undefined' && marked.parse) ? marked.parse(cleanText) : '<p>' + cleanText + '</p>';
 
-            const actionHTML = `
-                <div class="chat-generate-card" style="margin-top: 12px; padding: 12px 14px; background: rgba(123, 97, 255, 0.12); border: 1px solid var(--primary); border-radius: 8px; text-align: left;">
-                    <div style="font-weight: 600; font-size: 13px; color: var(--primary-hover); margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
-                        <i class="fa-solid fa-wand-magic-sparkles"></i> Redactar Ficha de Especificación (.md)
-                    </div>
-                    <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 10px;">
-                        ¿Deseas generar el archivo Markdown completo para esta funcionalidad en <code>specs/features/${featFolder}/</code>?
-                    </div>
-                    <button type="button" class="btn btn-primary btn-sm btn-generate-from-chat" data-name="${featName}" data-folder="${featFolder}" data-desc="${featDesc}">
-                        <i class="fa-solid fa-file-circle-plus"></i> Generar especificación .md de ${featName}
-                    </button>
-                </div>
-            `;
+            const cleanFeatName = escapeHtml(featName);
+            const cleanFeatFolder = escapeHtml(featFolder);
+            const cleanFeatDesc = escapeHtml(featDesc);
+            const actionHTML = '<div class="chat-generate-card" style="margin-top: 12px; padding: 12px 14px; background: rgba(123, 97, 255, 0.12); border: 1px solid var(--primary); border-radius: 8px; text-align: left;">' +
+                    '<div style="font-weight: 600; font-size: 13px; color: var(--primary-hover); margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">' +
+                        '<i class="fa-solid fa-wand-magic-sparkles"></i> Redactar Ficha de Especificación (.md)' +
+                    '</div>' +
+                    '<div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 10px;">' +
+                        '¿Deseas generar el archivo Markdown completo para esta funcionalidad en <code>specs/features/' + cleanFeatFolder + '/</code>?' +
+                    '</div>' +
+                    '<button type="button" class="btn btn-primary btn-sm btn-generate-from-chat" data-name="' + cleanFeatName + '" data-folder="' + cleanFeatFolder + '" data-desc="' + cleanFeatDesc + '">' +
+                        '<i class="fa-solid fa-file-circle-plus"></i> Generar especificación .md de ' + cleanFeatName +
+                    '</button>' +
+                '</div>';
 
             msgBody.innerHTML = parsedHTML + actionHTML;
             const genBtn = msgBody.querySelector('.btn-generate-from-chat');
@@ -2390,7 +2669,7 @@ async function sendCopilotMessage(text) {
     } catch (e) {
         removeCopilotTyping(typingId);
         console.error("Error en sendCopilotMessage:", e);
-        appendCopilotMsg('ai', `⚠️ Error de conexión: ${e.message}`);
+        appendCopilotMsg('ai', '⚠️ Error de conexión: ' + e.message);
     }
 }
 
@@ -2417,7 +2696,7 @@ function parseFeatureTag(text) {
                     data: {
                         name: nameMatch[1],
                         folder: folderMatch ? folderMatch[1] : 'modulos',
-                        description: descMatch ? descMatch[1] : `Especificación para ${nameMatch[1]}`
+                        description: descMatch ? descMatch[1] : 'Especificación para ' + nameMatch[1]
                     },
                     fullMatch: tagMatch[0]
                 };
@@ -2441,40 +2720,31 @@ function appendCopilotMsg(role, text, autoScroll = true) {
     }
 
     const msgDiv = document.createElement('div');
-    msgDiv.className = `copilot-msg msg-${role}`;
+    msgDiv.className = 'copilot-msg msg-' + role;
 
-    const parsedHTML = (typeof marked !== 'undefined' && marked.parse) ? marked.parse(cleanText) : `<p>${cleanText}</p>`;
+    const parsedHTML = (typeof marked !== 'undefined' && marked.parse) ? marked.parse(cleanText) : '<p>' + cleanText + '</p>';
 
     let actionHTML = '';
     if (featureActionData && featureActionData.name) {
-        const featName = featureActionData.name;
-        const featFolder = featureActionData.folder || 'general';
-        const featDesc = featureActionData.description || `Especificación técnica para ${featName}`;
+        const featName = escapeHtml(featureActionData.name);
+        const featFolder = escapeHtml(featureActionData.folder || 'general');
+        const featDesc = escapeHtml(featureActionData.description || ('Especificación técnica para ' + featName));
 
-        actionHTML = `
-            <div class="chat-generate-card" style="margin-top: 12px; padding: 12px 14px; background: rgba(123, 97, 255, 0.12); border: 1px solid var(--primary); border-radius: 8px; text-align: left;">
-                <div style="font-weight: 600; font-size: 13px; color: var(--primary-hover); margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
-                    <i class="fa-solid fa-wand-magic-sparkles"></i> Redactar Ficha de Especificación (.md)
-                </div>
-                <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 10px;">
-                    ¿Deseas generar el archivo Markdown completo para esta funcionalidad en <code>specs/features/${featFolder}/</code>?
-                </div>
-                <button type="button" class="btn btn-primary btn-sm btn-generate-from-chat" data-name="${featName}" data-folder="${featFolder}" data-desc="${featDesc}">
-                    <i class="fa-solid fa-file-circle-plus"></i> Generar especificación .md de ${featName}
-                </button>
-            </div>
-        `;
+        actionHTML = '<div class="chat-generate-card" style="margin-top: 12px; padding: 12px 14px; background: rgba(123, 97, 255, 0.12); border: 1px solid var(--primary); border-radius: 8px; text-align: left;">' +
+            '<div style="font-weight: 600; font-size: 13px; color: var(--primary-hover); margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">' +
+                '<i class="fa-solid fa-wand-magic-sparkles"></i> Redactar Ficha de Especificación (.md)' +
+            '</div>' +
+            '<div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 10px;">' +
+                '¿Deseas generar el archivo Markdown completo para esta funcionalidad en <code>specs/features/' + featFolder + '/</code>?' +
+            '</div>' +
+            '<button type="button" class="btn btn-primary btn-sm btn-generate-from-chat" data-name="' + featName + '" data-folder="' + featFolder + '" data-desc="' + featDesc + '">' +
+                '<i class="fa-solid fa-file-circle-plus"></i> Generar especificación .md de ' + featName +
+            '</button>' +
+        '</div>';
     }
 
-    msgDiv.innerHTML = `
-        <div class="msg-avatar">
-            <i class="fa-solid ${role === 'user' ? 'fa-user' : 'fa-robot'}"></i>
-        </div>
-        <div class="msg-body">
-            ${parsedHTML}
-            ${actionHTML}
-        </div>
-    `;
+    msgDiv.innerHTML = '<div class="msg-avatar"><i class="fa-solid ' + (role === 'user' ? 'fa-user' : 'fa-robot') + '"></i></div>' +
+        '<div class="msg-body">' + parsedHTML + actionHTML + '</div>';
 
     const genBtn = msgDiv.querySelector('.btn-generate-from-chat');
     if (genBtn) {
@@ -2494,7 +2764,7 @@ function appendCopilotMsg(role, text, autoScroll = true) {
 async function generateFeatureFromChat(btnEl, name, folder, desc) {
     if (btnEl) {
         btnEl.disabled = true;
-        btnEl.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Redactando especificación por IA...`;
+        btnEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Redactando especificación por IA...';
     }
 
     const folderSlug = (folder || 'general').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'general';
@@ -2503,11 +2773,11 @@ async function generateFeatureFromChat(btnEl, name, folder, desc) {
     const featObj = {
         id: featSlug,
         name: name,
-        description: desc || `Especificación para ${name}`,
+        description: desc || 'Especificación para ' + name,
         folder: folderSlug
     };
 
-    showToast(`Generando especificación .md para ${name}...`, "info");
+    showToast('Generando especificación .md para ' + name + '...', "info");
 
     try {
         const response = await fetch('/api/generate-feature', {
@@ -2528,13 +2798,13 @@ async function generateFeatureFromChat(btnEl, name, folder, desc) {
             }
 
             renderSpecTree();
-            const targetKey = `features/${folderSlug}/${featSlug}`;
+            const targetKey = 'features/' + folderSlug + '/' + featSlug;
             selectSpecFile(targetKey);
-            showToast(`¡Ficha ${targetKey}.md creada y guardada con éxito!`, "success");
-            appendCopilotMsg('ai', `✅ **¡Archivo Creado!** Se ha redactado y guardado exitosamente el archivo \`specs/features/${folderSlug}/${featSlug}.md\`. Ya la puedes visualizar y editar en el panel de especificaciones a la izquierda.`);
+            showToast('¡Ficha ' + targetKey + '.md creada y guardada con éxito!', "success");
+            appendCopilotMsg('ai', '✅ **¡Archivo Creado!** Se ha redactado y guardado exitosamente el archivo specs/features/' + folderSlug + '/' + featSlug + '.md. Ya la puedes visualizar y editar en el panel de especificaciones a la izquierda.');
 
             if (btnEl) {
-                btnEl.innerHTML = `<i class="fa-solid fa-circle-check"></i> Especificación creada`;
+                btnEl.innerHTML = '<i class="fa-solid fa-circle-check"></i> Especificación creada';
                 btnEl.style.background = 'rgba(0, 230, 118, 0.2)';
                 btnEl.style.borderColor = '#00e676';
                 btnEl.style.color = '#00e676';
@@ -2547,7 +2817,7 @@ async function generateFeatureFromChat(btnEl, name, folder, desc) {
         showToast("Error al generar la especificación desde el chat", "error");
         if (btnEl) {
             btnEl.disabled = false;
-            btnEl.innerHTML = `<i class="fa-solid fa-file-circle-plus"></i> Reintentar generación`;
+            btnEl.innerHTML = '<i class="fa-solid fa-file-circle-plus"></i> Reintentar generación';
         }
     }
 }
@@ -2563,13 +2833,11 @@ function appendCopilotTyping() {
     const msgDiv = document.createElement('div');
     msgDiv.id = typingId;
     msgDiv.className = 'copilot-msg msg-ai copilot-typing-msg';
-    msgDiv.innerHTML = `
-        <div class="msg-avatar"><i class="fa-solid fa-robot" style="color: var(--primary);"></i></div>
-        <div class="msg-body" style="font-style: italic; color: var(--text-secondary); display: flex; align-items: center; gap: 8px;">
-            <i class="fa-solid fa-circle-notch fa-spin" style="color: var(--accent); font-size: 14px;"></i>
-            <span>Spec Copilot analizando respuesta...</span>
-        </div>
-    `;
+    msgDiv.innerHTML = '<div class="msg-avatar"><i class="fa-solid fa-robot" style="color: var(--primary);"></i></div>' +
+        '<div class="msg-body" style="font-style: italic; color: var(--text-secondary); display: flex; align-items: center; gap: 8px;">' +
+            '<i class="fa-solid fa-circle-notch fa-spin" style="color: var(--accent); font-size: 14px;"></i>' +
+            '<span>Spec Copilot analizando respuesta...</span>' +
+        '</div>';
     container.appendChild(msgDiv);
     setTimeout(() => {
         container.scrollTop = container.scrollHeight;

@@ -26,5 +26,7 @@
     "decisions": "# Registro de Decisiones de Arquitectura (ADR)\n \n ## ADR-01: Uso de API de Gemini para Refinamiento\n *   **Estatus:** Aceptado\n *   **Contexto:** Necesitamos un descubrimiento inteligente de requisitos.\n *   **Decisión:** Integrar Gemini para generar preguntas condicionales y pre-escribir las specs.\n *   **Consecuencias:** Mayor velocidad de diseño y consistencia técnica inicial.",
     "glossary": "# Glosario de Términos\n \n *   **MVP:** Minimum Viable Product (Producto Mínimo Viable).\n *   **Spec IDE:** Entorno de especificaciones técnicas interactivas.\n *   **SSOT:** Single Source of Truth (Fuente única de verdad).",
     "agents": "# Instrucciones para Agentes de Código (System Prompts)\n \n Este archivo sirve como prompt del sistema para herramientas como Cursor, Cline, Aider o Roo Code.\n \n ```text\n Actúa como un desarrollador experto que va a implementar el proyecto.\n Tu fuente única de verdad es la carpeta /specs del proyecto.\n No escribas código que contradiga las definiciones en:\n - architecture.md\n - database.md\n - api.md\n ```"
-  }
+  },
+  "featuresList": [],
+  "updatedAt": 1788712453507
 }

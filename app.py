@@ -27,47 +27,19 @@ def load_dotenv():
                         val = parts[1].strip().strip('"').strip("'")
                         os.environ[key] = val
 
+import project_manager
+
 load_dotenv()
 
 app = FastAPI(title="Spec IDE Backend")
 
 ROOT_APP_DIR = os.path.abspath(os.path.dirname(__file__))
-ACTIVE_PROJECT_CONFIG_FILE = os.path.join(ROOT_APP_DIR, ".active_project.json")
-RECENT_PROJECTS_CONFIG_FILE = os.path.join(ROOT_APP_DIR, ".recent_projects.json")
 
 def register_recent_project(path: str):
-    abs_path = os.path.abspath(path.strip())
-    recent_paths = []
-    if os.path.exists(RECENT_PROJECTS_CONFIG_FILE):
-        try:
-            with open(RECENT_PROJECTS_CONFIG_FILE, "r", encoding="utf-8") as f:
-                recent_paths = json.load(f)
-        except Exception:
-            recent_paths = []
-            
-    if abs_path not in recent_paths:
-        recent_paths.insert(0, abs_path)
-    else:
-        recent_paths.remove(abs_path)
-        recent_paths.insert(0, abs_path)
-        
-    try:
-        with open(RECENT_PROJECTS_CONFIG_FILE, "w", encoding="utf-8") as f:
-            json.dump(recent_paths[:20], f, ensure_ascii=False, indent=2)
-    except Exception as e:
-        logger.error(f"Error guardando recent_projects: {str(e)}")
+    project_manager.register_project(path)
 
 def load_saved_target_project_path() -> str:
-    if os.path.exists(ACTIVE_PROJECT_CONFIG_FILE):
-        try:
-            with open(ACTIVE_PROJECT_CONFIG_FILE, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                saved_path = data.get("active_path")
-                if saved_path and os.path.exists(saved_path):
-                    return os.path.abspath(saved_path)
-        except Exception as e:
-            logger.error(f"Error cargando active_project.json: {str(e)}")
-    return ROOT_APP_DIR
+    return project_manager.load_active_project_path()
 
 # Estado global de la ruta destino del proyecto activo
 TARGET_PROJECT_PATH = load_saved_target_project_path()
@@ -78,19 +50,8 @@ def get_target_project_path() -> str:
 
 def set_target_project_path(path: str) -> str:
     global TARGET_PROJECT_PATH
-    abs_path = os.path.abspath(path.strip())
-    if not os.path.exists(abs_path):
-        os.makedirs(abs_path, exist_ok=True)
+    abs_path = project_manager.set_active_project(path)
     TARGET_PROJECT_PATH = abs_path
-    
-    # Persistir la ruta activa
-    try:
-        with open(ACTIVE_PROJECT_CONFIG_FILE, "w", encoding="utf-8") as f:
-            json.dump({"active_path": abs_path}, f, ensure_ascii=False, indent=2)
-    except Exception as e:
-        logger.error(f"Error guardando active_project.json: {str(e)}")
-        
-    register_recent_project(abs_path)
     return TARGET_PROJECT_PATH
 
 def get_project_file() -> str:
@@ -101,6 +62,10 @@ def get_specs_dir() -> str:
 
 class SetProjectPathRequest(BaseModel):
     project_path: str
+
+class DeleteProjectRequest(BaseModel):
+    project_path: str
+    delete_files: bool = False
 
 class IdeaAnalysisRequest(BaseModel):
     idea: str
@@ -581,67 +546,47 @@ async def set_project_path_endpoint(req: SetProjectPathRequest):
 
 @app.get("/api/recent-projects")
 async def get_recent_projects():
-    projects = []
-    scanned_paths = set()
+    try:
+        projects = project_manager.list_projects()
+        current_active = get_target_project_path()
+        return {"status": "success", "projects": projects, "active_path": current_active}
+    except Exception as e:
+        logger.error(f"Error en get_recent_projects: {str(e)}")
+        return {"status": "error", "projects": [], "active_path": get_target_project_path()}
 
-    registered_paths = []
-    if os.path.exists(RECENT_PROJECTS_CONFIG_FILE):
-        try:
-            with open(RECENT_PROJECTS_CONFIG_FILE, "r", encoding="utf-8") as f:
-                registered_paths = json.load(f)
-        except Exception:
-            registered_paths = []
+@app.post("/api/rescan-projects")
+async def rescan_projects_endpoint():
+    try:
+        projects = project_manager.rescan_projects()
+        current_active = get_target_project_path()
+        return {
+            "status": "success",
+            "message": f"Se escanearon e indexaron {len(projects)} proyectos en SQLite",
+            "projects": projects,
+            "active_path": current_active
+        }
+    except Exception as e:
+        logger.error(f"Error en rescan_projects_endpoint: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
-    # Escanear subcarpeta ./projects si existe
-    projects_folder = os.path.join(ROOT_APP_DIR, "projects")
-    if os.path.exists(projects_folder):
-        for item in os.listdir(projects_folder):
-            full_item_path = os.path.join(projects_folder, item)
-            if os.path.isdir(full_item_path):
-                if full_item_path not in registered_paths:
-                    registered_paths.append(full_item_path)
+@app.post("/api/delete-project")
+async def delete_project_endpoint(req: DeleteProjectRequest):
+    try:
+        res = project_manager.delete_project(req.project_path, req.delete_files)
+        active_path = get_target_project_path()
+        if active_path == os.path.abspath(req.project_path):
+            all_projs = project_manager.list_projects()
+            new_active = all_projs[0]["path"] if all_projs else ROOT_DIR
+            set_target_project_path(new_active)
 
-    # Escanear directorio padre para detectar otros proyectos creados en el entorno
-    parent_dir = os.path.dirname(ROOT_APP_DIR)
-    if os.path.exists(parent_dir):
-        try:
-            for item in os.listdir(parent_dir):
-                full_item_path = os.path.join(parent_dir, item)
-                if os.path.isdir(full_item_path):
-                    if full_item_path not in registered_paths:
-                        registered_paths.append(full_item_path)
-        except Exception as e:
-            logger.error(f"Error escaneando directorio padre: {str(e)}")
-
-    # Incluir la carpeta raíz si tiene project.json
-    if ROOT_APP_DIR not in registered_paths:
-        registered_paths.append(ROOT_APP_DIR)
-
-    current_active_path = get_target_project_path()
-
-    for p in registered_paths:
-        p_abs = os.path.abspath(p)
-        if p_abs in scanned_paths:
-            continue
-        scanned_paths.add(p_abs)
-        
-        proj_file = os.path.join(p_abs, "project.json")
-        if os.path.exists(proj_file):
-            try:
-                with open(proj_file, "r", encoding="utf-8") as f:
-                    pdata = json.load(f)
-                    projects.append({
-                        "name": pdata.get("name", os.path.basename(p_abs)),
-                        "path": p_abs,
-                        "updatedAt": pdata.get("updatedAt", os.path.getmtime(proj_file) * 1000),
-                        "isActive": (p_abs == current_active_path),
-                        "seedIdea": pdata.get("seedIdea", "")
-                    })
-            except Exception as e:
-                logger.error(f"Error leyendo project.json en {p_abs}: {str(e)}")
-
-    projects.sort(key=lambda x: x.get("updatedAt", 0), reverse=True)
-    return {"status": "success", "projects": projects, "active_path": current_active_path}
+        return {
+            "status": "success",
+            "message": res.get("message", "Proyecto eliminado"),
+            "projects": project_manager.list_projects()
+        }
+    except Exception as e:
+        logger.error(f"Error en delete_project_endpoint: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/select-folder-dialog")
 async def select_folder_dialog():
@@ -902,6 +847,7 @@ async def save_project(req: SaveProjectRequest):
                 except Exception as file_err:
                     logger.error(f"Error escribiendo archivo individual {name_key} en save_project: {str(file_err)}")
                     
+        register_recent_project(get_target_project_path())
         return {"status": "success", "message": "Proyecto y archivos físicos guardados localmente"}
     except Exception as e:
         logger.error(f"Error al guardar proyecto: {str(e)}")
@@ -2171,24 +2117,32 @@ async def open_specs_folder():
 async def serve_root():
     index_path = os.path.join(static_dir, "index.html")
     if os.path.exists(index_path):
-        return FileResponse(index_path)
+        headers = {"Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache", "Expires": "0"}
+        return FileResponse(index_path, headers=headers)
     return JSONResponse(status_code=404, content={"message": "Frontend index.html not found"})
 
 # Servir index.html para todas las demás rutas no API (SPA routing fallback)
 @app.get("/{rest_of_path:path}")
 async def serve_spa(rest_of_path: str):
     file_path = os.path.join(static_dir, rest_of_path)
+    headers = {"Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache", "Expires": "0"}
     if os.path.exists(file_path) and os.path.isfile(file_path):
-        return FileResponse(file_path)
+        return FileResponse(file_path, headers=headers)
     
     index_path = os.path.join(static_dir, "index.html")
     if os.path.exists(index_path):
-        return FileResponse(index_path)
+        return FileResponse(index_path, headers=headers)
     
-    return JSONResponse(status_code=404, content={"message": "Frontend static files not built yet"})
+class NoCacheStaticFiles(StaticFiles):
+    async def get_response(self, path: str, scope):
+        response = await super().get_response(path, scope)
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+        return response
 
 # Montar los estáticos al final para permitir que las rutas de la API tengan prioridad
-app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
+app.mount("/", NoCacheStaticFiles(directory=static_dir, html=True), name="static")
 
 if __name__ == "__main__":
     import uvicorn
