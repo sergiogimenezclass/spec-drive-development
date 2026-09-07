@@ -278,6 +278,33 @@ async function initApp() {
     await checkExistingProject();
 }
 
+// Actualizar la etiqueta visual del modelo seleccionado en la barra superior
+function updateHeaderModelLabel(modelId) {
+    const textSpan = document.getElementById('header-selected-model-text');
+    const menuItems = document.querySelectorAll('.model-menu-item');
+    
+    const labels = {
+        'gemini-2.5-flash': '⚡ 2.5 Flash',
+        'gemini-3.1-pro-preview': '🧠 3.1 Pro',
+        'gemini-2.0-flash': '⚡ 2.0 Flash',
+        'gemini-flash-latest': '⚡ Flash Latest',
+        'deepseek-chat': '🐳 DeepSeek V3',
+        'deepseek-reasoner': '🐳 DeepSeek R1'
+    };
+    
+    if (textSpan) {
+        textSpan.innerText = labels[modelId] || modelId;
+    }
+    
+    menuItems.forEach(item => {
+        if (item.getAttribute('data-value') === modelId) {
+            item.classList.add('active');
+        } else {
+            item.classList.remove('active');
+        }
+    });
+}
+
 // Cargar configuraciones del almacenamiento local
 function loadSettings() {
     state.apiKey = localStorage.getItem('gemini_api_key') || '';
@@ -290,8 +317,7 @@ function loadSettings() {
     const keyInput = document.getElementById('gemini-api-key');
     if (keyInput) keyInput.value = state.apiKey;
 
-    const headerModelSelect = document.getElementById('header-model-select');
-    if (headerModelSelect) headerModelSelect.value = state.selectedModel;
+    updateHeaderModelLabel(state.selectedModel);
     
     const theme = localStorage.getItem('theme');
     if (theme === 'dark') {
@@ -617,17 +643,37 @@ function setupEventListeners() {
     if (sendCopilotBtn) sendCopilotBtn.addEventListener('click', () => sendCopilotMessage());
     if (exploreFinishWizardBtn) exploreFinishWizardBtn.addEventListener('click', extractAnswersAndLaunchWizard);
 
-    // Event Listeners del Selector de Modelo de IA y Modal de Cuota
-    const headerModelSelect = document.getElementById('header-model-select');
-    if (headerModelSelect) {
-        headerModelSelect.value = state.selectedModel || 'gemini-2.5-flash';
-        headerModelSelect.addEventListener('change', (e) => {
-            state.selectedModel = e.target.value;
-            localStorage.setItem('gemini_model', state.selectedModel);
-            const quotaSelect = document.getElementById('quota-model-select');
-            if (quotaSelect) quotaSelect.value = state.selectedModel;
-            const modelLabel = e.target.options[e.target.selectedIndex].text;
-            showToast(`Modelo de IA cambiado a: ${modelLabel}`, "info");
+    // Event Listeners del Selector de Modelo de IA Personalizado (Dropdown UI)
+    const triggerBtn = document.getElementById('btn-custom-model-trigger');
+    const modelMenu = document.getElementById('custom-model-menu');
+    const menuItems = document.querySelectorAll('.model-menu-item');
+
+    if (triggerBtn && modelMenu) {
+        triggerBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            modelMenu.classList.toggle('hidden');
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!modelMenu.contains(e.target) && e.target !== triggerBtn) {
+                modelMenu.classList.add('hidden');
+            }
+        });
+
+        menuItems.forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const val = item.getAttribute('data-value');
+                state.selectedModel = val;
+                localStorage.setItem('gemini_model', val);
+                
+                updateHeaderModelLabel(val);
+                const quotaSelect = document.getElementById('quota-model-select');
+                if (quotaSelect) quotaSelect.value = val;
+                
+                modelMenu.classList.add('hidden');
+                showToast(`Modelo de IA cambiado a: ${item.innerText}`, "info");
+            });
         });
     }
 
@@ -662,9 +708,7 @@ function setupEventListeners() {
             localStorage.setItem('gemini_model', modelVal);
 
             updateKeyStatusUI();
-
-            const headerModelSelect = document.getElementById('header-model-select');
-            if (headerModelSelect) headerModelSelect.value = modelVal;
+            updateHeaderModelLabel(modelVal);
 
             if (quotaModal) quotaModal.classList.add('hidden');
             showToast("Configuración de IA guardada exitosamente", "success");

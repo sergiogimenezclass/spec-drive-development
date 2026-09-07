@@ -2007,3 +2007,26 @@ select option {
     color: #f8fafc !important;
     padding: 8px 12px;
 }
+
+.model-menu-item {
+    padding: 10px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #cbd5e1;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.model-menu-item:hover {
+    background: rgba(123, 97, 255, 0.2);
+    color: #ffffff;
+}
+
+.model-menu-item.active {
+    background: rgba(123, 97, 255, 0.35);
+    color: #ffffff;
+    font-weight: 700;
+}

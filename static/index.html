@@ -62,17 +62,21 @@
                     <span>Guía de Specs</span>
                 </button>
 
-                <!-- Selector de Modelo de IA -->
-                <div class="model-select-wrapper" style="display: flex; align-items: center; gap: 6px; background: var(--bg-surface-hover); padding: 4px 10px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
-                    <i class="fa-solid fa-microchip" style="color: var(--primary); font-size: 13px;"></i>
-                    <select id="header-model-select" style="background: transparent; border: none; color: var(--text-primary); font-family: inherit; font-size: 12px; font-weight: 600; outline: none; cursor: pointer;" title="Seleccionar Modelo de IA (Gemini / DeepSeek)">
-                        <option value="gemini-3.1-pro-preview">🧠 3.1 Pro (Máxima Potencia)</option>
-                        <option value="gemini-2.5-flash" selected>⚡ 2.5 Flash (Ultra Rápido - Recomendado)</option>
-                        <option value="gemini-2.0-flash">⚡ 2.0 Flash (Alta Disponibilidad)</option>
-                        <option value="gemini-flash-latest">⚡ Flash Latest (Última Versión)</option>
-                        <option value="deepseek-chat">🐳 DeepSeek V3 (deepseek-chat)</option>
-                        <option value="deepseek-reasoner">🐳 DeepSeek R1 (deepseek-reasoner)</option>
-                    </select>
+                <!-- Selector de Modelo de IA (Desplegable Personalizado) -->
+                <div class="custom-model-dropdown" id="custom-model-dropdown-container" style="position: relative;">
+                    <button id="btn-custom-model-trigger" type="button" style="display: flex; align-items: center; gap: 8px; background: var(--bg-surface-solid); border: 1px solid var(--border-color); color: var(--text-primary); padding: 6px 12px; border-radius: var(--radius-md); font-size: 12px; font-weight: 600; cursor: pointer; transition: background 0.2s, border-color 0.2s;" title="Seleccionar Modelo de IA">
+                        <i class="fa-solid fa-microchip" style="color: var(--primary);"></i>
+                        <span id="header-selected-model-text">⚡ 2.5 Flash</span>
+                        <i class="fa-solid fa-chevron-down" style="font-size: 10px; color: var(--text-muted);"></i>
+                    </button>
+                    <div id="custom-model-menu" class="custom-model-menu hidden" style="position: absolute; top: calc(100% + 6px); left: 0; min-width: 250px; background: #181825; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: var(--radius-md); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6); z-index: 9999; padding: 6px 0;">
+                        <div class="model-menu-item" data-value="gemini-2.5-flash">⚡ 2.5 Flash (Ultra Rápido)</div>
+                        <div class="model-menu-item" data-value="gemini-3.1-pro-preview">🧠 3.1 Pro (Máxima Potencia)</div>
+                        <div class="model-menu-item" data-value="gemini-2.0-flash">⚡ 2.0 Flash (Alta Disponibilidad)</div>
+                        <div class="model-menu-item" data-value="gemini-flash-latest">⚡ Flash Latest (Última Versión)</div>
+                        <div class="model-menu-item" data-value="deepseek-chat">🐳 DeepSeek V3 (deepseek-chat)</div>
+                        <div class="model-menu-item" data-value="deepseek-reasoner">🐳 DeepSeek R1 (deepseek-reasoner)</div>
+                    </div>
                 </div>
 
                 <!-- Clave API y Enlace -->
