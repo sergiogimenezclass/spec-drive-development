@@ -1855,10 +1855,25 @@ REGLAS DE RESPUESTA:
 
         chat = model.start_chat(history=gemini_history)
         
-        full_prompt = f"{system_instruction}\n\nPREGUNTA DEL USUARIO:\n{req.message}" if len(gemini_history) == 0 else req.message
+        full_prompt = f"{system_instruction}\n\nPREGUNTA E INSTRUCCIÓN DEL USUARIO:\n{req.message}"
         
         response = chat.send_message(full_prompt)
         reply_text = clean_markdown(response.text)
+
+        # Fallback de seguridad: si el usuario solicitó generar/crear una feature y la IA no generó la etiqueta
+        if "GENERATE_FEATURE:" not in reply_text:
+            user_msg_lower = req.message.lower()
+            trigger_words = ["generar", "crear", "hacer", "implementar", "redactar", "feature", "funcionalidad", "especificacion", "especificación", "md", "fichas", "archivos", "modulo", "módulo", "boton", "botón", "planificar"]
+            if any(w in user_msg_lower for w in trigger_words):
+                clean_req = req.message.strip().replace('"', '').replace("'", "")
+                feat_name = clean_req[:40] if len(clean_req) <= 40 else clean_req[:37] + "..."
+                folder_name = "modulos"
+                payload_json = json.dumps({
+                    "name": feat_name,
+                    "folder": folder_name,
+                    "description": f"Especificación técnica generada desde el chat."
+                }, ensure_ascii=False)
+                reply_text += f'\n\n<!-- GENERATE_FEATURE: {payload_json} -->'
 
         # Guardar historial actualizado en el disco del proyecto
         history_file = os.path.join(get_target_project_path(), "chat_history.json")

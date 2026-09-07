@@ -2317,6 +2317,39 @@ async function sendCopilotMessage(queryText) {
     }
 }
 
+function parseFeatureTag(text) {
+    if (!text || typeof text !== 'string') return null;
+
+    const tagMatch = text.match(/<!--\s*GENERATE_FEATURE:\s*({[\s\S]*?})\s*-->/) ||
+                     text.match(/\[GENERATE_FEATURE:\s*({[\s\S]*?})\]/) ||
+                     text.match(/GENERATE_FEATURE:\s*({[\s\S]*?})/);
+
+    if (tagMatch && tagMatch[1]) {
+        const rawJson = tagMatch[1].trim();
+        try {
+            const data = JSON.parse(rawJson);
+            return { data, fullMatch: tagMatch[0] };
+        } catch (e) {
+            console.warn("Fallo JSON.parse en GENERATE_FEATURE, usando regex fallback:", e);
+            const nameMatch = rawJson.match(/"name"\s*:\s*"([^"]+)"/);
+            const folderMatch = rawJson.match(/"folder"\s*:\s*"([^"]+)"/);
+            const descMatch = rawJson.match(/"description"\s*:\s*"([^"]+)"/);
+
+            if (nameMatch && nameMatch[1]) {
+                return {
+                    data: {
+                        name: nameMatch[1],
+                        folder: folderMatch ? folderMatch[1] : 'modulos',
+                        description: descMatch ? descMatch[1] : `Especificación para ${nameMatch[1]}`
+                    },
+                    fullMatch: tagMatch[0]
+                };
+            }
+        }
+    }
+    return null;
+}
+
 function appendCopilotMsg(role, text, autoScroll = true) {
     const container = document.getElementById('copilot-messages');
     if (!container) return;
@@ -2324,15 +2357,10 @@ function appendCopilotMsg(role, text, autoScroll = true) {
     let featureActionData = null;
     let cleanText = text;
 
-    // Detectar etiqueta GENERATE_FEATURE
-    const tagMatch = text.match(/<!--\s*GENERATE_FEATURE:\s*({.*?})\s*-->/s) || text.match(/GENERATE_FEATURE:\s*({.*?})/s);
-    if (tagMatch && tagMatch[1]) {
-        try {
-            featureActionData = JSON.parse(tagMatch[1]);
-            cleanText = text.replace(tagMatch[0], '').trim();
-        } catch (e) {
-            console.error("Error parseando GENERATE_FEATURE tag:", e);
-        }
+    const tagResult = parseFeatureTag(text);
+    if (tagResult) {
+        featureActionData = tagResult.data;
+        cleanText = text.replace(tagResult.fullMatch, '').trim();
     }
 
     const msgDiv = document.createElement('div');
