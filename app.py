@@ -515,7 +515,38 @@ async def get_config():
 @app.get("/api/generation-status")
 async def get_generation_status():
     global GENERATION_STATUS
-    return GENERATION_STATUS
+    specs_dir = get_specs_dir()
+    disk_completed = []
+    
+    files_to_generate = [
+        "project.md", "product.md", "requirements.md", "user-stories.md",
+        "architecture.md", "database.md", "api.md", "openapi.json", "frontend.md",
+        "backend.md", "security.md", "integrations.md", "roadmap.md",
+        "tasks.md", "decisions.md", "glossary.md", "agents.md"
+    ]
+    
+    if os.path.exists(specs_dir):
+        for f in files_to_generate:
+            fp = os.path.join(specs_dir, f)
+            if os.path.exists(fp) and os.path.getsize(fp) > 0:
+                disk_completed.append(f)
+                
+    total = len(files_to_generate)
+    completed_count = len(disk_completed)
+    percent = int((completed_count / total) * 100) if total > 0 else 0
+    
+    is_generating = GENERATION_STATUS.get("is_generating", False)
+    if completed_count == total:
+        is_generating = False
+        
+    return {
+        "is_generating": is_generating,
+        "total_files": total,
+        "current_index": completed_count,
+        "current_filename": GENERATION_STATUS.get("current_filename", ""),
+        "completed_files": disk_completed,
+        "percent": percent
+    }
 
 @app.get("/api/project-path")
 async def get_project_path():
