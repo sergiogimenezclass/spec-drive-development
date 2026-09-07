@@ -128,6 +128,9 @@ class UnifiedResponse:
     def __init__(self, text: str):
         self.text = text
 
+    def __iter__(self):
+        yield self
+
 def call_openai_compatible_api(api_key: str, model_name: str, messages: list, json_mode: bool = False, base_url: str = "https://api.deepseek.com/chat/completions") -> str:
     clean_key = (api_key or "").strip()
     headers = {
@@ -1930,7 +1933,15 @@ REGLAS DE RESPUESTA:
             response = chat.send_message(full_prompt, stream=True)
             accumulated_text = ""
 
-            for chunk in response:
+            if isinstance(response, UnifiedResponse) or not hasattr(response, "__iter__"):
+                chunks = [response]
+            else:
+                try:
+                    chunks = iter(response)
+                except TypeError:
+                    chunks = [response]
+
+            for chunk in chunks:
                 chunk_text = getattr(chunk, "text", "") or ""
                 if chunk_text:
                     accumulated_text += chunk_text
