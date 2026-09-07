@@ -1616,6 +1616,22 @@ async function autocompleteActiveSection() {
     
     const filename = state.activeSpecFile;
     const moduleName = filename.replace('.md', '').replace('.json', '');
+    const btn = document.getElementById('btn-ai-autocomplete');
+    const previewPane = document.getElementById('markdown-preview-pane');
+    
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Redactando...`;
+    }
+    
+    if (previewPane) {
+        document.getElementById('autocomplete-loading-banner')?.remove();
+        const loadingBanner = document.createElement('div');
+        loadingBanner.id = 'autocomplete-loading-banner';
+        loadingBanner.style.cssText = "background: rgba(123, 97, 255, 0.15); border: 1px solid var(--primary); padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; display: flex; align-items: center; gap: 10px; color: var(--primary-hover); font-weight: 600; font-size: 13px;";
+        loadingBanner.innerHTML = `<i class="fa-solid fa-spinner fa-spin" style="font-size: 16px;"></i> Gemini está redactando y actualizando <strong style="margin-left:4px;">${filename}</strong>... Por favor aguarda unos segundos.`;
+        previewPane.prepend(loadingBanner);
+    }
     
     showToast(`Gemini está redactando ${filename}...`, "info");
     
@@ -1637,7 +1653,7 @@ async function autocompleteActiveSection() {
             state.currentProject = data.project;
             const mdContent = state.currentProject.specModules[moduleName] || '';
             renderMarkdownHTML(mdContent);
-            showToast(`${filename} redactado con éxito`, "success");
+            showToast(`¡${filename} redactado y actualizado con éxito!`, "success");
             updateGlobalProgressBar();
         } else {
             throw new Error(data.message || "Error al redactar la sección");
@@ -1645,6 +1661,12 @@ async function autocompleteActiveSection() {
     } catch (e) {
         console.error(e);
         showToast("Error al autocompletar sección con la IA", "error");
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = `<i class="fa-solid fa-wand-magic-sparkles"></i> Completar con IA`;
+        }
+        document.getElementById('autocomplete-loading-banner')?.remove();
     }
 }
 
