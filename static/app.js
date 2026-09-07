@@ -81,7 +81,7 @@ async function checkResponseForQuotaError(response, retryCallback = null) {
 
 // Estructura fija de los 16 archivos de la spec
 const SPEC_FILES = [
-    { name: 'project.md', label: 'Ficha Técnica', icon: 'fa-file-signature', status: 'completed' },
+    { name: 'project.md', label: 'Ficha Técnica', icon: 'fa-file-signature', status: 'pending' },
     { name: 'product.md', label: 'Producto & Valor', icon: 'fa-lightbulb', status: 'pending' },
     { name: 'requirements.md', label: 'Requisitos', icon: 'fa-list-check', status: 'pending' },
     { name: 'user-stories.md', label: 'Historias de Usuario', icon: 'fa-book-open-reader', status: 'pending' },
@@ -97,7 +97,7 @@ const SPEC_FILES = [
     { name: 'tasks.md', label: 'Lista de Tareas', icon: 'fa-clipboard-list', status: 'pending' },
     { name: 'decisions.md', label: 'Decisiones (ADR)', icon: 'fa-gavel', status: 'pending' },
     { name: 'glossary.md', label: 'Glosario', icon: 'fa-spell-check', status: 'pending' },
-    { name: 'agents.md', label: 'Instrucciones IA', icon: 'fa-robot', status: 'completed' }
+    { name: 'agents.md', label: 'Instrucciones IA', icon: 'fa-robot', status: 'pending' }
 ];
 
 // Documentación detallada de los 17 archivos de especificación para el Onboarding
@@ -859,25 +859,25 @@ function showScreen(screenId) {
 
 // Actualizar barra de completitud global
 function updateGlobalProgressBar() {
-    const total = SPEC_FILES.length - 2; // Excluimos Ficha Técnica y Prompt de Agente (que son automáticas)
+    const total = SPEC_FILES.length;
     let completed = 0;
     
     SPEC_FILES.forEach(file => {
-        if (file.name !== 'project.md' && file.name !== 'agents.md') {
-            const hasContent = state.currentProject.answers[file.name] || 
-                                (state.currentProject.specModules && state.currentProject.specModules[file.name.replace('.md', '').replace('.json', '')]);
-            if (hasContent) {
-                file.status = 'completed';
-                completed++;
-            } else {
-                file.status = 'pending';
-            }
+        const nameKey = file.name.replace('.md', '').replace('.json', '');
+        const hasContent = state.currentProject && state.currentProject.specModules && state.currentProject.specModules[nameKey] && state.currentProject.specModules[nameKey].trim().length > 0;
+        if (hasContent) {
+            file.status = 'completed';
+            completed++;
+        } else {
+            file.status = 'pending';
         }
     });
     
     const percentage = Math.round((completed / total) * 100);
-    document.getElementById('progress-percent').innerText = `${percentage}%`;
-    document.getElementById('progress-fill-bar').style.width = `${percentage}%`;
+    const percentEl = document.getElementById('progress-percent');
+    const fillEl = document.getElementById('progress-fill-bar');
+    if (percentEl) percentEl.innerText = `${percentage}%`;
+    if (fillEl) fillEl.style.width = `${percentage}%`;
     
     renderSpecTree();
 }
