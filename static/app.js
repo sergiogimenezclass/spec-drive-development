@@ -655,7 +655,7 @@ function setupEventListeners() {
         });
 
         document.addEventListener('click', (e) => {
-            if (!modelMenu.contains(e.target) && e.target !== triggerBtn) {
+            if (!modelMenu.contains(e.target) && !triggerBtn.contains(e.target)) {
                 modelMenu.classList.add('hidden');
             }
         });
