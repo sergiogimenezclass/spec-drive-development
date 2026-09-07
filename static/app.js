@@ -2544,7 +2544,13 @@ async function clearCopilotChat() {
 }
 
 async function sendCopilotMessage(text) {
-    if (!text || !text.trim()) return;
+    let msgText = text;
+    if (typeof msgText !== 'string' || !msgText.trim()) {
+        const input = document.getElementById('copilot-input');
+        if (input) msgText = input.value;
+    }
+    if (!msgText || typeof msgText !== 'string' || !msgText.trim()) return;
+    msgText = msgText.trim();
 
     const input = document.getElementById('copilot-input');
     if (input) {
@@ -2556,7 +2562,7 @@ async function sendCopilotMessage(text) {
     if (!container) return;
 
     // 1. Renderizar mensaje del usuario
-    appendCopilotMsg('user', text);
+    appendCopilotMsg('user', msgText);
 
     // 2. Renderizar indicador "Pensando..."
     const typingId = appendCopilotTyping();
@@ -2566,13 +2572,13 @@ async function sendCopilotMessage(text) {
             method: 'POST',
             headers: getAiHeaders(),
             body: JSON.stringify({
-                message: text,
+                message: msgText,
                 history: state.copilotHistory || [],
                 project_data: state.currentProject
             })
         });
 
-        const isQuota = await checkResponseForQuotaError(resp, () => sendCopilotMessage(text));
+        const isQuota = await checkResponseForQuotaError(resp, () => sendCopilotMessage(msgText));
         if (isQuota) {
             removeCopilotTyping(typingId);
             appendCopilotMsg('ai', '⚠️ Límite de cuota (429/Rate Limit) alcanzado. Puedes ingresar una clave de resguardo o cambiar de modelo en el pop-up.');
