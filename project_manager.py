@@ -186,68 +186,6 @@ def load_active_project_path() -> str:
             logger.error(f"Error leyendo active_project.json: {str(e)}")
     return ROOT_APP_DIR
 
-def rescan_projects() -> List[Dict[str, Any]]:
-    candidate_paths = set()
-
-    # 1. Leer rutas registradas en archivos legacy
-    for cfg_file in [RECENT_PROJECTS_CONFIG_FILE, os.path.join(GLOBAL_CONFIG_DIR, "recent_projects.json")]:
-        if os.path.exists(cfg_file):
-            try:
-                with open(cfg_file, "r", encoding="utf-8") as f:
-                    paths = json.load(f)
-                    for p in paths:
-                        if os.path.exists(p):
-                            candidate_paths.add(os.path.abspath(p))
-            except Exception:
-                pass
-
-    # 2. Escanear subcarpeta ./projects
-    projects_folder = os.path.join(ROOT_APP_DIR, "projects")
-    if os.path.exists(projects_folder):
-        for item in os.listdir(projects_folder):
-            full_path = os.path.join(projects_folder, item)
-            if os.path.isdir(full_path):
-                candidate_paths.add(os.path.abspath(full_path))
-
-    # 3. Escanear directorio padre del espacio de trabajo
-    parent_dir = os.path.dirname(ROOT_APP_DIR)
-    if os.path.exists(parent_dir):
-        try:
-            for item in os.listdir(parent_dir):
-                full_path = os.path.join(parent_dir, item)
-                if os.path.isdir(full_path):
-                    # Multi-heurística de detección:
-                    # - Heurística 1: Tiene project.json
-                    # - Heurística 2: Tiene carpeta specs/
-                    # - Heurística 3: Tiene cualquier archivo .md (ej: PRODUCT.md, especificacion_proyecto.md, README.md)
-                    # - Heurística 4: Contiene código/archivos de desarrollo
-                    has_pj = os.path.exists(os.path.join(full_path, "project.json"))
-                    has_specs = os.path.exists(os.path.join(full_path, "specs"))
-                    has_md = any(f.endswith(".md") for f in os.listdir(full_path)) if os.path.isdir(full_path) else False
-                    
-                    if has_pj or has_specs or has_md:
-                        candidate_paths.add(os.path.abspath(full_path))
-        except Exception as e:
-            logger.error(f"Error escaneando directorio padre {parent_dir}: {str(e)}")
-
-    # 4. Incluir siempre la carpeta raíz de Spec IDE
-    candidate_paths.add(ROOT_APP_DIR)
-
-    # Indexar en SQLite todos los candidatos descubiertos
-    current_active = load_active_project_path()
-    for p_abs in candidate_paths:
-        meta = _extract_project_metadata(p_abs)
-        is_act = (p_abs == current_active)
-        register_project(
-            path=p_abs,
-            name=meta["name"],
-            seed_idea=meta["seedIdea"],
-            updated_at=meta["updatedAt"],
-            is_active=is_act
-        )
-
-    return list_projects()
-
 def delete_project(path: str, delete_disk_files: bool = False) -> Dict[str, Any]:
     abs_path = os.path.abspath(path.strip())
     try:
@@ -296,9 +234,17 @@ def list_projects() -> List[Dict[str, Any]]:
     except Exception as e:
         logger.error(f"Error consultando proyectos desde SQLite: {str(e)}")
 
-    # Si la lista está vacía, forzar rescan
+    # Si la lista está vacía, registrar el proyecto activo actual
     if not res:
-        res = rescan_projects()
+        meta = register_project(current_active, is_active=True)
+        res = [{
+            "id": meta["id"],
+            "name": meta["name"],
+            "path": meta["path"],
+            "updatedAt": meta["updatedAt"],
+            "isActive": True,
+            "seedIdea": meta["seedIdea"]
+        }]
 
     return res
 
