@@ -1781,7 +1781,7 @@ async def autocomplete_file(req: AutocompleteFileRequest, x_gemini_key: str = He
     2. Si el archivo es '{filename}', asegúrate de detallar todos los aspectos relacionados con su temática (por ejemplo, si es 'security.md' habla sobre roles, auth, cifrado, OWASP; si es 'roadmap.md' sobre fases de release; si es 'integrations.md' sobre pasarelas de pago, webhooks, etc.).
     3. Si el archivo es 'openapi.json', devuelve únicamente un JSON válido que cumpla con el estándar OpenAPI 3.0.0. No incluyas explicaciones en texto para archivos JSON.
     4. Para archivos Markdown, no utilices bloques de código Markdown generales (como ```markdown o ```) para envolver tu respuesta completa; simplemente escribe el contenido Markdown crudo directamente.
-    5. Utiliza tablas, listas y diagramas Mermaid si es oportuno para hacer el documento sumamente premium.
+    5. DIAGRAMAS MERMAID OBLIGATORIOS: Si incluyes diagramas de flujo, esquemas de arquitectura, modelos de base de datos o secuencias de API, DEBES generarlos SIEMPRE en bloques de código Mermaid.js (utilizando la sintaxis ```mermaid ... ```). Queda estrictamente prohibido utilizar texto ASCII plano o esquemas gráficos de texto rígido.
     
     Escribe el documento completo para '{filename}':
     """
