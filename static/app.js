@@ -1963,6 +1963,7 @@ function renderMarkdownHTML(md) {
             gfm: true
         });
         pane.innerHTML = marked.parse(md);
+        renderMermaidInElement(pane);
     } catch (e) {
         console.error("Error parsing with marked.js:", e);
         // Fallback simple si la CDN no carga
@@ -1972,6 +1973,36 @@ function renderMarkdownHTML(md) {
             .replace(/>/g, "&gt;")
             .replace(/\n/g, '<br>');
         pane.innerHTML = html;
+        renderMermaidInElement(pane);
+    }
+}
+
+// Función auxiliar para renderizar diagramas Mermaid.js en cualquier elemento HTML
+function renderMermaidInElement(containerEl) {
+    if (!containerEl) return;
+    const mermaidCodeBlocks = containerEl.querySelectorAll('code.language-mermaid, pre.mermaid, code.mermaid');
+    if (mermaidCodeBlocks.length === 0) return;
+
+    mermaidCodeBlocks.forEach((codeEl) => {
+        const preEl = codeEl.tagName.toLowerCase() === 'pre' ? codeEl : codeEl.parentElement;
+        const diagramCode = codeEl.textContent;
+        const container = document.createElement('div');
+        container.className = 'mermaid';
+        container.style.cssText = 'background: rgba(15, 23, 42, 0.5); padding: 16px; border-radius: 8px; margin: 16px 0; overflow-x: auto; display: flex; justify-content: center; border: 1px solid rgba(255,255,255,0.1);';
+        container.textContent = diagramCode;
+        if (preEl && preEl.parentNode) {
+            preEl.parentNode.replaceChild(container, preEl);
+        }
+    });
+
+    if (typeof mermaid !== 'undefined') {
+        try {
+            mermaid.run({
+                nodes: containerEl.querySelectorAll('.mermaid')
+            });
+        } catch (mErr) {
+            console.error("Error rendering Mermaid diagrams:", mErr);
+        }
     }
 }
 
@@ -2597,6 +2628,7 @@ async function sendCopilotMessage(text) {
                 const cleanText = tagResult ? fullText.replace(tagResult.fullMatch, '').trim() : fullText;
                 const parsedHTML = (typeof marked !== 'undefined' && marked.parse) ? marked.parse(cleanText) : ('<p>' + escapeHtml(cleanText) + '</p>');
                 msgBody.innerHTML = parsedHTML;
+                renderMermaidInElement(msgBody);
 
                 if (tagResult && tagResult.data && tagResult.data.name) {
                     const featData = tagResult.data;
@@ -2743,6 +2775,7 @@ function appendCopilotMsg(role, text, autoScroll = true) {
 
     msgDiv.innerHTML = '<div class="msg-avatar"><i class="fa-solid ' + (role === 'user' ? 'fa-user' : 'fa-robot') + '"></i></div>' +
         '<div class="msg-body">' + parsedHTML + actionHTML + '</div>';
+    renderMermaidInElement(msgDiv.querySelector('.msg-body'));
 
     const genBtn = msgDiv.querySelector('.btn-generate-from-chat');
     if (genBtn) {
