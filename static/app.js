@@ -834,7 +834,8 @@ function setupEventListeners() {
     document.getElementById('wizard-finish-btn').addEventListener('click', finishInterviewAndGenerateSpecs);
 
     // Exportar Specs y Cancelar Generación
-    document.getElementById('btn-export-specs').addEventListener('click', exportSpecsToDisk);
+    document.getElementById('btn-export-specs')?.addEventListener('click', () => exportSpecsToDisk(false));
+    document.getElementById('btn-force-regenerate-all')?.addEventListener('click', () => exportSpecsToDisk(true));
     document.getElementById('cancel-generation-btn')?.addEventListener('click', cancelGeneration);
 
     // Modal de Onboarding / Guía de Specs
@@ -888,7 +889,7 @@ function setupEventListeners() {
     if (closeCopilotBtn) closeCopilotBtn.addEventListener('click', toggleCopilotPanel);
     if (clearCopilotBtn) clearCopilotBtn.addEventListener('click', clearCopilotChat);
     if (sendCopilotBtn) sendCopilotBtn.addEventListener('click', () => sendCopilotMessage());
-    if (exploreFinishWizardBtn) exploreFinishWizardBtn.addEventListener('click', extractAnswersAndLaunchWizard);
+    if (exploreFinishWizardBtn) exploreFinishWizardBtn.addEventListener('click', () => exportSpecsToDisk(true));
 
     // Event Listeners del Selector de Modelo de IA Personalizado (Dropdown UI)
     const triggerBtn = document.getElementById('btn-custom-model-trigger');
@@ -1751,14 +1752,10 @@ function loadWorkspace() {
     const exploreBtn = document.getElementById('btn-explore-finish-wizard');
     const copilotPanel = document.getElementById('workspace-copilot-panel');
 
-    if (!hasGeneratedSpecs) {
-        if (exploreBtn) exploreBtn.classList.remove('hidden');
-        if (copilotPanel) {
-            copilotPanel.classList.remove('hidden');
-            copilotPanel.classList.add('expanded');
-        }
-    } else {
-        if (exploreBtn) exploreBtn.classList.add('hidden');
+    if (exploreBtn) exploreBtn.classList.remove('hidden');
+    if (!hasGeneratedSpecs && copilotPanel) {
+        copilotPanel.classList.remove('hidden');
+        copilotPanel.classList.add('expanded');
     }
 }
 
@@ -2128,14 +2125,14 @@ async function saveProjectToServer() {
     }
 }
 
-// Exportar las especificaciones y escribirlas en el disco local
-async function exportSpecsToDisk() {
+// Exportar las especificaciones y escribirlas en el disco local (con opción de forzar re-generación IA)
+async function exportSpecsToDisk(forceRegenerate = false) {
     if (!state.apiKey && !state.hasBackendApiKey) {
         showToast("Ingresa tu API Key de Gemini en el Header o configúrala en el servidor", "error");
         return;
     }
     
-    showToast("Redactando y compilando archivos en /specs...", "info");
+    showToast(forceRegenerate ? "Redactando y regenerando los 17 archivos de especificación con IA..." : "Redactando y compilando archivos en /specs...", "info");
     await saveProjectToServer();
     startPollingGenerationStatus();
     
@@ -2146,7 +2143,10 @@ async function exportSpecsToDisk() {
                 'Content-Type': 'application/json',
                 'X-Gemini-Key': state.apiKey
             },
-            body: JSON.stringify({ project_data: state.currentProject })
+            body: JSON.stringify({
+                project_data: state.currentProject,
+                force_regenerate: forceRegenerate
+            })
         });
         const data = await response.json();
         stopPollingGenerationStatus();

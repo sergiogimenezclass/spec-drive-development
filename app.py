@@ -1407,7 +1407,7 @@ def export_specs(req: SaveProjectRequest, x_gemini_key: Optional[str] = Header(N
             # Fallback o generación basada en reglas si falla la IA
             if not content:
                 if filename == "project.md":
-                content = f"""# Ficha Técnica del Proyecto: {project.get('name', 'Proyecto Spec-First')}
+                    content = f"""# Ficha Técnica del Proyecto: {project.get('name', 'Proyecto Spec-First')}
  
  ## Información General
  *   **Idea Semilla:** {idea}
