@@ -744,36 +744,6 @@ function setupEventListeners() {
         openFolderBtn.addEventListener('click', openExistingProjectFolder);
     }
 
-    // Re-escanear proyectos en disco
-    const rescanBtn = document.getElementById('btn-rescan-projects');
-    if (rescanBtn) {
-        rescanBtn.addEventListener('click', async () => {
-            try {
-                showToast("Escaneando e indexando disco...", "info");
-                rescanBtn.disabled = true;
-                const icon = rescanBtn.querySelector('i');
-                if (icon) icon.classList.add('fa-spin');
-
-                const resp = await fetch('/api/rescan-projects', { method: 'POST' });
-                const data = await resp.json();
-                
-                if (data.status === 'success' && data.projects) {
-                    renderRecentProjectsList(data.projects);
-                    showToast(data.message || `Proyectos indexados: ${data.projects.length}`, "success");
-                } else {
-                    showToast("No se pudieron re-escanear los proyectos.", "warning");
-                }
-            } catch (err) {
-                console.error("Error re-escaneando proyectos:", err);
-                showToast("Error de comunicación al re-escanear disco.", "error");
-            } finally {
-                rescanBtn.disabled = false;
-                const icon = rescanBtn.querySelector('i');
-                if (icon) icon.classList.remove('fa-spin');
-            }
-        });
-    }
-
     // Alternar Tema
     document.getElementById('theme-toggle-btn').addEventListener('click', () => {
         state.isDarkTheme = !state.isDarkTheme;
