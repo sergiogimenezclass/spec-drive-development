@@ -1,0 +1,57 @@
+name: agendapro
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: agendapro
+      POSTGRES_PASSWORD: agendapro
+      POSTGRES_DB: agendapro
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agendapro -d agendapro"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    ports:
+      - "1025:1025" # SMTP
+      - "8025:8025" # UI web para inspeccionar emails
+
+  backend:
+    build: ./backend
+    environment:
+      FLASK_ENV: production
+      DATABASE_URL: postgresql+psycopg://agendapro:agendapro@db:5432/agendapro
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-prod}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change-me-jwt-in-prod}
+      TIMEZONE: ${TIMEZONE:-America/Argentina/Buenos_Aires}
+      SMTP_HOST: mailhog
+      SMTP_PORT: "1025"
+      MAIL_FROM: "AgendaPro Simple <no-reply@agendapro.local>"
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8080}
+      EMAIL_ENABLED: "true"
+    depends_on:
+      db:
+        condition: service_healthy
+      mailhog:
+        condition: service_started
+    expose:
+      - "8000"
+    command: >
+      sh -c "flask db upgrade && gunicorn --bind 0.0.0.0:8000 --workers 3 wsgi:app"
+
+  frontend:
+    build: ./frontend
+    depends_on:
+      - backend
+    ports:
+      - "8080:80"
+
+volumes:
+  pgdata:

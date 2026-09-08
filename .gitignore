@@ -7,4 +7,5 @@ __pycache__/
 .env.*
 .active_project.json
 .recent_projects.json
-
+node_modules/
+dist/
