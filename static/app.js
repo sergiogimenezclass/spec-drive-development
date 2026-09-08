@@ -676,7 +676,7 @@ function renderRecentProjectsList(projects) {
                     </div>
                     <div class="project-item-action" style="display: flex; align-items: center; gap: 8px;">
                         <button type="button" class="btn btn-sm btn-border btn-open-project" style="white-space: nowrap; font-size: 12px; font-weight: 600; padding: 6px 12px;">
-                            <i class="fa-solid fa-folder-open" style="color: var(--accent);"></i> Cargar Proyecto
+                            <i class="fa-solid fa-folder-open" style="color: var(--accent);"></i> Abrir Proyecto
                         </button>
                         <button type="button" class="btn-delete-project btn btn-sm" data-path="${cleanPath}" data-name="${cleanName}" title="Eliminar proyecto de la lista o borrar carpeta" style="padding: 6px 10px; color: #ef4444; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.25); border-radius: var(--radius-md); cursor: pointer; font-size: 12px;">
                             <i class="fa-solid fa-trash-can"></i>
