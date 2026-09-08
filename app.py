@@ -1349,8 +1349,43 @@ def export_specs(req: SaveProjectRequest, x_gemini_key: Optional[str] = Header(N
         if filename in ai_markdowns:
             content = ai_markdowns[filename]
         else:
-            # Fallback o generación basada en reglas
-            if filename == "project.md":
+            # Generar contenido completo por IA si no se generó previamente
+            if filename != "project.md":
+                try:
+                    logger.info(f"Generando {filename} por IA en export_specs...")
+                    auto_prompt = f"""
+                    Actúa como un Staff Software Architect de nivel mundial.
+                    Redacta el contenido técnico completo en Markdown para el archivo '{filename}' de este proyecto.
+                    
+                    Idea semilla: "{idea}"
+                    Respuestas recopiladas: {json.dumps(answers, ensure_ascii=False)}
+                    Metadatos: {json.dumps(metadata, ensure_ascii=False)}
+                    
+                    INSTRUCCIONES DE DISEÑO:
+                    1. Genera documentación técnica detallada, profesional y estructurada específica para '{filename}'.
+                    2. Si es 'backend.md', detalla la arquitectura de servicios backend, componentes, APIs consumidas o expuestas, manejo de datos y diagramas de flujo.
+                    3. Si es 'frontend.md', detalla componentes UI, vistas, patrones de diseño y flujo de interacción.
+                    4. Si es 'security.md', detalla matrices RBAC, autenticación, protección de datos y OWASP.
+                    5. Si es 'requirements.md', detalla lista completa de RF y RNF categorizados.
+                    6. Si es 'user-stories.md', detalla las historias de usuario con criterios de aceptación (Dado/Cuando/Entonces).
+                    7. Si es 'integrations.md', detalla servicios externos, APIs y webhooks.
+                    8. Si es 'roadmap.md', detalla las fases MVP, V1 y V2.
+                    9. Si es 'tasks.md', detalla la lista estructurada de tareas TODO de desarrollo.
+                    10. Si es 'decisions.md', detalla los Registros de Decisiones de Arquitectura (ADR).
+                    11. DIAGRAMAS MERMAID OBLIGATORIOS: Si incluyes diagramas, DEBES generarlos SIEMPRE en bloques de código Mermaid.js (```mermaid ... ```).
+                    
+                    Devuelve únicamente el contenido Markdown listo para ser guardado. No uses bloques de código ```markdown para envolver todo el archivo.
+                    """
+                    resp = model.generate_content(auto_prompt)
+                    ai_content = clean_markdown(resp.text)
+                    if len(ai_content) > 50:
+                        content = ai_content
+                except Exception as gen_err:
+                    logger.error(f"Error generando {filename} por IA en export_specs: {str(gen_err)}")
+
+            # Fallback o generación basada en reglas si falla la IA
+            if not content:
+                if filename == "project.md":
                 content = f"""# Ficha Técnica del Proyecto: {project.get('name', 'Proyecto Spec-First')}
  
  ## Información General
