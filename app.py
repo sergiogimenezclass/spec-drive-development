@@ -557,21 +557,6 @@ async def get_recent_projects():
         logger.error(f"Error en get_recent_projects: {str(e)}")
         return {"status": "error", "projects": [], "active_path": get_target_project_path()}
 
-@app.post("/api/rescan-projects")
-async def rescan_projects_endpoint():
-    try:
-        projects = project_manager.rescan_projects()
-        current_active = get_target_project_path()
-        return {
-            "status": "success",
-            "message": f"Se escanearon e indexaron {len(projects)} proyectos en SQLite",
-            "projects": projects,
-            "active_path": current_active
-        }
-    except Exception as e:
-        logger.error(f"Error en rescan_projects_endpoint: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-
 @app.post("/api/delete-project")
 async def delete_project_endpoint(req: DeleteProjectRequest):
     try:
