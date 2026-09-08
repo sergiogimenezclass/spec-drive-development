@@ -76,6 +76,7 @@ class NextQuestionsRequest(BaseModel):
 
 class SaveProjectRequest(BaseModel):
     project_data: Dict[str, Any]
+    force_regenerate: Optional[bool] = False
 
 class PlanFeaturesRequest(BaseModel):
     project_data: Dict[str, Any]
@@ -1048,6 +1049,24 @@ def export_specs(req: SaveProjectRequest, x_gemini_key: Optional[str] = Header(N
     if "specModules" not in project:
         project["specModules"] = {}
         
+    force_regenerate = getattr(req, "force_regenerate", False)
+
+    # Cargar historial de chat si existe para enriquecer el contexto de la IA
+    chat_history_summary = ""
+    history_file = os.path.join(get_target_project_path(), "chat_history.json")
+    if os.path.exists(history_file):
+        try:
+            with open(history_file, "r", encoding="utf-8") as hf:
+                history_data = json.load(hf)
+                chat_summary_items = []
+                for msg in history_data[-15:]:
+                    role = msg.get("role", "user")
+                    content = msg.get("content", "")[:300]
+                    chat_summary_items.append(f"[{role}]: {content}")
+                chat_history_summary = "\n".join(chat_summary_items)
+        except Exception as err:
+            logger.error(f"Error leyendo chat_history.json en export_specs: {str(err)}")
+            
     answers = project.get("answers", {})
     metadata = project.get("metadata", {})
     idea = project.get("seedIdea", "")
@@ -1106,7 +1125,7 @@ def export_specs(req: SaveProjectRequest, x_gemini_key: Optional[str] = Header(N
     try:
         GENERATION_STATUS["current_filename"] = "product.md"
         filepath = os.path.join(specs_dir, "product.md")
-        if os.path.exists(filepath) and os.path.getsize(filepath) > 100:
+        if not force_regenerate and os.path.exists(filepath) and os.path.getsize(filepath) > 100:
             logger.info("product.md ya existe en disco, reutilizando contenido existente.")
             with open(filepath, "r", encoding="utf-8") as f:
                 save_single_spec("product.md", f.read())
@@ -1118,15 +1137,17 @@ def export_specs(req: SaveProjectRequest, x_gemini_key: Optional[str] = Header(N
             1. Visión General del Producto y Propuesta de Valor.
             2. Objetivos de Negocio y Métricas de Éxito.
             3. Usuarios, Actores y sus Roles detallados.
-            4. Reglas de Negocio Críticas e Inquebrantables (como validaciones lógicas obligatorias, límites de dominio, ej: stock nunca negativo, borrados lógicos obligatorios, etc. estructurados como una lista clara con ejemplos).
+            4. Reglas de Negocio Críticas e Inquebrantables.
             5. Casos de Uso principales e Historias clave.
-            6. DIAGRAMA MERMAID OBLIGATORIO: Incluye al menos un diagrama de flujo o mapa visual de navegación del usuario escrito exclusivamente en sintaxis Mermaid.js (bloque ```mermaid graph TD ... ```). Queda estrictamente prohibido usar diagramas en texto ASCII plano o esquemas gráficos rígidos.
+            6. DIAGRAMA MERMAID OBLIGATORIO: Incluye al menos un diagrama de flujo o mapa visual de navegación del usuario en sintaxis Mermaid.js (```mermaid graph TD ... ```).
             
             Basándote en la idea del proyecto: "{idea}"
-            y las respuestas recopiladas: {json.dumps(answers, ensure_ascii=False)}
-            y metadatos: {json.dumps(metadata, ensure_ascii=False)}
+            Respuestas recopiladas: {json.dumps(answers, ensure_ascii=False)}
+            Metadatos: {json.dumps(metadata, ensure_ascii=False)}
+            Conversación previa en el chat:
+            {chat_history_summary}
             
-            Devuelve únicamente el contenido Markdown listo para ser guardado. No utilices bloques de código Markdown (como ```markdown) para envolver tu respuesta.
+            Devuelve únicamente el contenido Markdown listo para ser guardado. No utilices bloques ```markdown para envolver tu respuesta.
             """
             logger.info("Generando product.md por IA...")
             resp = model.generate_content(prod_prompt)
