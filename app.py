@@ -165,6 +165,52 @@ def call_openai_compatible_api(api_key: str, model_name: str, messages: list, js
         logger.error(f"Error conectando con DeepSeek API: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error al conectar con servidor DeepSeek: {str(e)}")
 
+def call_openai_compatible_api_stream(api_key: str, model_name: str, messages: list, base_url: str = "https://api.deepseek.com/chat/completions"):
+    clean_key = (api_key or "").strip()
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {clean_key}"
+    }
+    m_name = model_name if model_name in ["deepseek-chat", "deepseek-reasoner"] else "deepseek-chat"
+    payload = {
+        "model": m_name,
+        "messages": messages,
+        "temperature": 0.3,
+        "stream": True
+    }
+    data = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(base_url, data=data, headers=headers, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=120) as response:
+            for line in response:
+                line_str = line.decode("utf-8").strip()
+                if line_str.startswith("data: "):
+                    data_body = line_str[6:].strip()
+                    if data_body == "[DONE]":
+                        break
+                    try:
+                        res_json = json.loads(data_body)
+                        choices = res_json.get("choices", [])
+                        if choices:
+                            delta = choices[0].get("delta", {})
+                            content = delta.get("content", "")
+                            if content:
+                                yield UnifiedResponse(content)
+                    except Exception:
+                        pass
+    except urllib.error.HTTPError as e:
+        err_body = e.read().decode("utf-8")
+        logger.error(f"HTTPError desde DeepSeek API ({e.code}): {err_body}")
+        if e.code == 429:
+            raise HTTPException(status_code=429, detail=f"⚠️ DeepSeek Límite de Cuota Alcanzado (429): {err_body}")
+        elif e.code == 401:
+            raise HTTPException(status_code=401, detail=f"⚠️ DeepSeek API Key no válida (401): {err_body}")
+        else:
+            raise HTTPException(status_code=e.code, detail=f"⚠️ Error en servicio DeepSeek ({e.code}): {err_body}")
+    except Exception as e:
+        logger.error(f"Error conectando con DeepSeek API: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error al conectar con servidor DeepSeek: {str(e)}")
+
 class DeepSeekChatSessionWrapper:
     def __init__(self, key: str, model_name: str, history=None):
         self.key = key
@@ -179,12 +225,15 @@ class DeepSeekChatSessionWrapper:
                     content = content.get("text", str(content))
                 self.history.append({"role": role, "content": str(content)})
 
-    def send_message(self, content, **kwargs):
+    def send_message(self, content, stream=False, **kwargs):
         user_content = str(content)
         self.history.append({"role": "user", "content": user_content})
+        if stream:
+            return call_openai_compatible_api_stream(self.key, self.model_name, self.history)
         res_text = call_openai_compatible_api(self.key, self.model_name, self.history)
         self.history.append({"role": "assistant", "content": res_text})
         return UnifiedResponse(res_text)
+
 
 class GeminiChatSessionWrapper:
     def __init__(self, generative_model, history=None, model_wrapper=None, key_used=None, **kwargs):
