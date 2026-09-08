@@ -2572,74 +2572,96 @@ async function sendCopilotMessage(text) {
         const decoder = new TextDecoder('utf-8');
         let fullText = '';
         let buffer = '';
+        let displayedCount = 0;
+        let isStreamClosed = false;
 
-        while (true) {
-            const { value, done } = await reader.read();
-            if (done) break;
+        // Loop de renderizado suave (efecto máquina de escribir tipo LLM)
+        const renderTimer = setInterval(() => {
+            if (displayedCount < fullText.length) {
+                const backlog = fullText.length - displayedCount;
+                // Velocidad dinámica: 2 a 15 caracteres por ciclo según acumulación
+                const step = backlog > 300 ? 15 : (backlog > 100 ? 8 : (backlog > 30 ? 4 : 2));
+                displayedCount = Math.min(fullText.length, displayedCount + step);
 
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split('\n\n');
-            buffer = lines.pop() || '';
+                const sliceText = fullText.slice(0, displayedCount);
+                const tagResult = parseFeatureTag(sliceText);
+                const cleanText = tagResult ? sliceText.replace(tagResult.fullMatch, '').trim() : sliceText;
+                const parsedHTML = (typeof marked !== 'undefined' && marked.parse) ? marked.parse(cleanText) : ('<p>' + escapeHtml(cleanText) + '</p>');
 
-            for (const line of lines) {
-                const trimmed = line.trim();
-                if (!trimmed.startsWith('data: ')) continue;
-                try {
-                    const payload = JSON.parse(trimmed.slice(6));
-                    if (payload.type === 'chunk' && payload.content) {
-                        fullText += payload.content;
+                msgBody.innerHTML = parsedHTML;
+                container.scrollTop = container.scrollHeight;
+            } else if (isStreamClosed) {
+                clearInterval(renderTimer);
+                // Renderizado final completo
+                const tagResult = parseFeatureTag(fullText);
+                const cleanText = tagResult ? fullText.replace(tagResult.fullMatch, '').trim() : fullText;
+                const parsedHTML = (typeof marked !== 'undefined' && marked.parse) ? marked.parse(cleanText) : ('<p>' + escapeHtml(cleanText) + '</p>');
+                msgBody.innerHTML = parsedHTML;
 
-                        const tagResult = parseFeatureTag(fullText);
-                        const cleanText = tagResult ? fullText.replace(tagResult.fullMatch, '').trim() : fullText;
-                        const parsedHTML = (typeof marked !== 'undefined' && marked.parse) ? marked.parse(cleanText) : ('<p>' + cleanText + '</p>');
-                        msgBody.innerHTML = parsedHTML;
-                        container.scrollTop = container.scrollHeight;
-                    } else if (payload.type === 'done') {
-                        if (payload.history) {
-                            state.copilotHistory = payload.history;
-                        }
-                    } else if (payload.type === 'error') {
-                        msgBody.innerHTML += '<p style="color:var(--danger)">⚠️ Error: ' + payload.message + '</p>';
+                if (tagResult && tagResult.data && tagResult.data.name) {
+                    const featData = tagResult.data;
+                    const featName = featData.name;
+                    const featFolder = featData.folder || 'modulos';
+                    const featDesc = featData.description || 'Especificación técnica para ' + featName;
+
+                    const cleanFeatName = escapeHtml(featName);
+                    const cleanFeatFolder = escapeHtml(featFolder);
+                    const cleanFeatDesc = escapeHtml(featDesc);
+
+                    const actionHTML = '<div class="chat-generate-card" style="margin-top: 12px; padding: 12px 14px; background: rgba(123, 97, 255, 0.12); border: 1px solid var(--primary); border-radius: 8px; text-align: left;">' +
+                            '<div style="font-weight: 600; font-size: 13px; color: var(--primary-hover); margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">' +
+                                '<i class="fa-solid fa-wand-magic-sparkles"></i> Redactar Ficha de Especificación (.md)' +
+                            '</div>' +
+                            '<div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 10px;">' +
+                                '¿Deseas generar el archivo Markdown completo para esta funcionalidad en <code>specs/features/' + cleanFeatFolder + '/</code>?' +
+                            '</div>' +
+                            '<button type="button" class="btn btn-primary btn-sm btn-generate-from-chat" data-name="' + cleanFeatName + '" data-folder="' + cleanFeatFolder + '" data-desc="' + cleanFeatDesc + '">' +
+                                '<i class="fa-solid fa-file-circle-plus"></i> Generar especificación .md de ' + cleanFeatName +
+                            '</button>' +
+                        '</div>';
+
+                    msgBody.innerHTML = parsedHTML + actionHTML;
+                    const genBtn = msgBody.querySelector('.btn-generate-from-chat');
+                    if (genBtn) {
+                        genBtn.addEventListener('click', async () => {
+                            await generateFeatureFromChat(genBtn, genBtn.dataset.name, genBtn.dataset.folder, genBtn.dataset.desc);
+                        });
                     }
-                } catch (e) {
-                    console.error("Error procesando chunk de streaming:", e);
+                }
+                container.scrollTop = container.scrollHeight;
+            }
+        }, 20);
+
+        try {
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n\n');
+                buffer = lines.pop() || '';
+
+                for (const line of lines) {
+                    const trimmed = line.trim();
+                    if (!trimmed.startsWith('data: ')) continue;
+                    try {
+                        const payload = JSON.parse(trimmed.slice(6));
+                        if (payload.type === 'chunk' && payload.content) {
+                            fullText += payload.content;
+                        } else if (payload.type === 'done') {
+                            if (payload.history) {
+                                state.copilotHistory = payload.history;
+                            }
+                        } else if (payload.type === 'error') {
+                            fullText += '\n\n⚠️ Error: ' + payload.message;
+                        }
+                    } catch (e) {
+                        console.error("Error procesando chunk de streaming:", e);
+                    }
                 }
             }
-        }
-
-        // Renderizar botón de acción de especificación si la etiqueta está presente
-        const tagResult = parseFeatureTag(fullText);
-        if (tagResult && tagResult.data && tagResult.data.name) {
-            const featData = tagResult.data;
-            const featName = featData.name;
-            const featFolder = featData.folder || 'modulos';
-            const featDesc = featData.description || 'Especificación técnica para ' + featName;
-            const cleanText = fullText.replace(tagResult.fullMatch, '').trim();
-            const parsedHTML = (typeof marked !== 'undefined' && marked.parse) ? marked.parse(cleanText) : '<p>' + cleanText + '</p>';
-
-            const cleanFeatName = escapeHtml(featName);
-            const cleanFeatFolder = escapeHtml(featFolder);
-            const cleanFeatDesc = escapeHtml(featDesc);
-            const actionHTML = '<div class="chat-generate-card" style="margin-top: 12px; padding: 12px 14px; background: rgba(123, 97, 255, 0.12); border: 1px solid var(--primary); border-radius: 8px; text-align: left;">' +
-                    '<div style="font-weight: 600; font-size: 13px; color: var(--primary-hover); margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">' +
-                        '<i class="fa-solid fa-wand-magic-sparkles"></i> Redactar Ficha de Especificación (.md)' +
-                    '</div>' +
-                    '<div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 10px;">' +
-                        '¿Deseas generar el archivo Markdown completo para esta funcionalidad en <code>specs/features/' + cleanFeatFolder + '/</code>?' +
-                    '</div>' +
-                    '<button type="button" class="btn btn-primary btn-sm btn-generate-from-chat" data-name="' + cleanFeatName + '" data-folder="' + cleanFeatFolder + '" data-desc="' + cleanFeatDesc + '">' +
-                        '<i class="fa-solid fa-file-circle-plus"></i> Generar especificación .md de ' + cleanFeatName +
-                    '</button>' +
-                '</div>';
-
-            msgBody.innerHTML = parsedHTML + actionHTML;
-            const genBtn = msgBody.querySelector('.btn-generate-from-chat');
-            if (genBtn) {
-                genBtn.addEventListener('click', async () => {
-                    await generateFeatureFromChat(genBtn, genBtn.dataset.name, genBtn.dataset.folder, genBtn.dataset.desc);
-                });
-            }
-            container.scrollTop = container.scrollHeight;
+        } finally {
+            isStreamClosed = true;
         }
 
     } catch (e) {
