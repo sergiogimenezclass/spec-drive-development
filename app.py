@@ -1120,6 +1120,7 @@ def export_specs(req: SaveProjectRequest, x_gemini_key: Optional[str] = Header(N
             3. Usuarios, Actores y sus Roles detallados.
             4. Reglas de Negocio Críticas e Inquebrantables (como validaciones lógicas obligatorias, límites de dominio, ej: stock nunca negativo, borrados lógicos obligatorios, etc. estructurados como una lista clara con ejemplos).
             5. Casos de Uso principales e Historias clave.
+            6. DIAGRAMA MERMAID OBLIGATORIO: Incluye al menos un diagrama de flujo o mapa visual de navegación del usuario escrito exclusivamente en sintaxis Mermaid.js (bloque ```mermaid graph TD ... ```). Queda estrictamente prohibido usar diagramas en texto ASCII plano o esquemas gráficos rígidos.
             
             Basándote en la idea del proyecto: "{idea}"
             y las respuestas recopiladas: {json.dumps(answers, ensure_ascii=False)}
@@ -1151,6 +1152,7 @@ def export_specs(req: SaveProjectRequest, x_gemini_key: Optional[str] = Header(N
             1. Pila Tecnológica Propuesta (Frontend, Backend, Base de Datos, Servidor) y su justificación.
             2. Decisiones de Diseño Clave e Infraestructura (Conceptos de despliegue).
             3. Estructura de Módulos del Sistema y Flujo de Datos.
+            4. DIAGRAMA MERMAID OBLIGATORIO: Incluye un diagrama conceptual completo de la arquitectura del sistema y flujo de componentes en sintaxis Mermaid.js (bloque ```mermaid graph TD ... ```). Queda estrictamente prohibido usar gráficos en texto ASCII plano.
             
             Basándote en la idea del proyecto: "{idea}"
             y las respuestas recopiladas: {json.dumps(answers, ensure_ascii=False)}
@@ -1180,9 +1182,10 @@ def export_specs(req: SaveProjectRequest, x_gemini_key: Optional[str] = Header(N
             Genera el contenido completo en formato Markdown para el archivo 'database.md'.
             Debe incluir:
             1. Diseño Conceptual del Modelo de Datos.
-            2. Listado de Entidades principales con sus atributos (tipos de datos) y relaciones.
-            3. Esquema físico completo escrito en sintaxis Prisma DSL (un bloque de código schema.prisma completo y listo para copiar).
-            4. Índices, restricciones o consideraciones de rendimiento.
+            2. DIAGRAMA MERMAID OBLIGATORIO: Incluye un diagrama de Entidad-Relación completo escrito exclusivamente en sintaxis Mermaid.js (bloque ```mermaid erDiagram ... ``` con entidades, atributos principales y cardinalidad de relaciones). Queda estrictamente prohibido usar gráficos en texto ASCII plano.
+            3. Listado de Entidades principales con sus atributos (tipos de datos) y relaciones.
+            4. Esquema físico completo escrito en sintaxis Prisma DSL (un bloque de código schema.prisma completo y listo para copiar).
+            5. Índices, restricciones o consideraciones de rendimiento.
             
             Basándote en la idea del proyecto: "{idea}"
             y las respuestas recopiladas: {json.dumps(answers, ensure_ascii=False)}
@@ -1212,8 +1215,9 @@ def export_specs(req: SaveProjectRequest, x_gemini_key: Optional[str] = Header(N
             Genera el contenido completo en formato Markdown para el archivo 'api.md'.
             Debe incluir:
             1. Protocolo de Comunicación, Autenticación y Manejo de Sesiones.
-            2. Listado de Endpoints clave (Rutas, Métodos HTTP, Payloads de petición y respuesta esperados).
-            3. Estructura de errores comunes.
+            2. DIAGRAMA MERMAID OBLIGATORIO: Incluye un diagrama de secuencia del flujo de peticiones/respuestas o autenticación en sintaxis Mermaid.js (bloque ```mermaid sequenceDiagram ... ```). Queda estrictamente prohibido usar gráficos en texto ASCII plano.
+            3. Listado de Endpoints clave (Rutas, Métodos HTTP, Payloads de petición y respuesta esperados).
+            4. Estructura de errores comunes.
             
             Basándote en la idea del proyecto: "{idea}"
             y las respuestas recopiladas: {json.dumps(answers, ensure_ascii=False)}
@@ -1647,6 +1651,7 @@ def generate_feature(req: GenerateFeatureRequest, x_gemini_key: Optional[str] = 
     1. Historia de Usuario (User Story): Formato "Como [Rol], Quiero [Acción], Para [Beneficio]".
     2. Criterios de Aceptación Detallados: Reglas de comportamiento esperadas (con formato Dado/Cuando/Entonces si aplica).
     3. Casos de Error y Casos Borde (Edge cases): Errores de red, entradas inválidas, violaciones de reglas de negocio, etc.
+    4. DIAGRAMA MERMAID OBLIGATORIO: Si incluyes diagramas de flujo, secuencias de interacción o estados, DEBES generarlos SIEMPRE en bloques de código Mermaid.js (bloque ```mermaid ... ```). Queda estrictamente prohibido usar gráficos en texto ASCII plano o esquemas gráficos de texto.
     
     Restricción Absoluta:
     * NO escribas código de implementación (como funciones, endpoints en Node/Python, etc.). Mantente exclusivamente en la etapa de diseño funcional, diseño técnico y documentación.
@@ -1946,9 +1951,10 @@ DOCUMENTOS DE ESPECIFICACIÓN DISPONIBLES:
 REGLAS DE RESPUESTA:
 1. Responde de forma clara, directa y estructurada en Markdown (usa títulos breves, viñetas, bloques de código SQL/JSON/JS cuando aporte valor).
 2. Cita siempre el documento de origen cuando menciones detalles específicos (ejemplo: [product.md], [architecture.md], [database.md], etc.).
-3. Si el usuario te pide un resumen alto nivel, sé sintético y resalta el propósito del proyecto, la arquitectura propuesta y la pila tecnológica.
-4. Mantén un tono profesional, servicial y experto.
-5. SI EL USUARIO TE PIDE CREAR, GENERAR O IMPLEMENTAR UNA NUEVA FUNCIONALIDAD/FEATURE (O CREAR SUS ARCHIVOS .MD):
+3. DIAGRAMAS Y GRÁFICOS: Si incluyes o el usuario te pide esquemas de arquitectura, modelos de base de datos, flujos de usuario o secuencias de API, DEBES generarlos SIEMPRE en bloques de código Mermaid.js (bloque ```mermaid ... ```). NUNCA utilices texto ASCII plano o gráficos de texto para diagramas.
+4. Si el usuario te pide un resumen alto nivel, sé sintético y resalta el propósito del proyecto, la arquitectura propuesta y la pila tecnológica.
+5. Mantén un tono profesional, servicial y experto.
+6. SI EL USUARIO TE PIDE CREAR, GENERAR O IMPLEMENTAR UNA NUEVA FUNCIONALIDAD/FEATURE (O CREAR SUS ARCHIVOS .MD):
    - Explica brevemente la solución arquitectónica.
    - AL FINAL DE TU RESPUESTA, incluye obligatoriamente una etiqueta con este formato JSON exacto en una sola línea (reemplazando con los valores apropiados):
      <!-- GENERATE_FEATURE: {{"name": "Nombre de la Feature", "folder": "nombre-carpeta", "description": "Breve descripcion de la feature"}} -->
