@@ -677,11 +677,14 @@ async def select_folder_dialog():
 def analyze_idea(req: IdeaAnalysisRequest, x_gemini_key: Optional[str] = Header(None), x_gemini_fallback_key: Optional[str] = Header(None), x_gemini_model: Optional[str] = Header(None)):
     model = get_gemini_model(x_gemini_key, x_gemini_fallback_key, x_gemini_model)
     
+    local_docs = get_local_project_docs_summary()
+    
     prompt = f"""
     Eres un Staff Software Architect y Product Designer.
     Analiza la siguiente idea de software y extrae información clave estructurada en formato JSON válido.
     
     Idea del usuario: "{req.idea}"
+    {local_docs}
     
     Debes devolver ÚNICAMENTE un objeto JSON con las siguientes claves (no uses markdown, no incluyas texto antes o después del JSON):
     {{
@@ -1045,6 +1048,7 @@ def get_local_project_docs_summary() -> str:
     docs_content = []
     ignored_dirs = {".git", ".venv", "node_modules", "specs", "__pycache__", "dist", "build"}
     ignored_files = {"chat_history.json", "project.json", ".active_project.json", ".recent_projects.json"}
+    valid_exts = (".md", ".txt", ".json", ".rst", ".yaml", ".yml")
     
     try:
         for root, dirs, files in os.walk(project_dir):
@@ -1052,13 +1056,13 @@ def get_local_project_docs_summary() -> str:
             for file in files:
                 if file in ignored_files or file.startswith("."):
                     continue
-                if file.endswith((".md", ".txt", ".json", ".rst", ".yaml", ".yml")):
+                if file.lower().endswith(valid_exts):
                     rel_path = os.path.relpath(os.path.join(root, file), project_dir)
                     full_path = os.path.join(root, file)
-                    if os.path.getsize(full_path) < 100000:
+                    if os.path.getsize(full_path) < 200000:
                         try:
                             with open(full_path, "r", encoding="utf-8", errors="ignore") as f:
-                                text = f.read(2000)
+                                text = f.read(4000)
                                 if text.strip():
                                     docs_content.append(f"--- Documento local ({rel_path}) ---\n{text}")
                         except Exception:
