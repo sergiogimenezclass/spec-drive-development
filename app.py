@@ -685,31 +685,31 @@ def analyze_idea(req: IdeaAnalysisRequest, x_gemini_key: Optional[str] = Header(
     
     Debes devolver ÚNICAMENTE un objeto JSON con las siguientes claves (no uses markdown, no incluyas texto antes o después del JSON):
     {{
-        "domain": "Dominio principal del producto (ej: E-commerce, EdTech, FinTech)",
-        "productType": "Tipo de producto (ej: Web SPA, SaaS, Mobile App)",
-        "actors": ["Actor 1", "Actor 2", "..."],
-        "detectedFeatures": ["Funcionalidad 1", "Funcionalidad 2", "..."],
-        "risks": ["Riesgo 1", "Riesgo 2", "..."],
-        "uncertainties": ["Incertidumbre 1", "Incertidumbre 2", "..."],
+        "domain": "Dominio principal del producto (ej: E-commerce, EdTech, FinTech, Audio/Voice, Developer Tool, Mobile IME)",
+        "productType": "Tipo de producto (ej: Web SPA, SaaS, Mobile App, Chrome Extension, CLI Tool)",
+        "actors": ["Actor 1", "Actor 2"],
+        "detectedFeatures": ["Funcionalidad 1", "Funcionalidad 2"],
+        "risks": ["Riesgo 1", "Riesgo 2"],
+        "uncertainties": ["Incertidumbre 1", "Incertidumbre 2"],
         "questions": [
             {{
-                "id": "q_auth",
-                "section": "Seguridad",
-                "label": "¿Qué tipo de autenticación y roles de usuario necesitas para los actores definidos?",
+                "id": "q_domain_specific_1",
+                "section": "Arquitectura / Dominio",
+                "label": "Pregunta técnica o de negocio profundamente relevante y específica para esta idea de software (EVITA preguntas genéricas sobre auth o DB a menos que la idea sea un sistema multiusuario o web app).",
                 "type": "select",
-                "options": ["Ninguna / Sin autenticación (API instalada, CLI, herramienta local)", "Email y Contraseña tradicional", "OAuth (Google, Github)", "Autenticación sin contraseña (Magic Links)", "Múltiples Roles complejos"]
+                "options": ["Opción 1 adaptada al contexto", "Opción 2 adaptada al contexto", "Opción 3"]
             }},
             {{
-                "id": "q_database",
-                "section": "Arquitectura",
-                "label": "¿Tienes alguna preferencia de base de datos?",
+                "id": "q_domain_specific_2",
+                "section": "Rendimiento / Privacidad / UX",
+                "label": "Pregunta específica sobre integraciones clave, latencia, privacidad o experiencia del usuario para este software.",
                 "type": "select",
-                "options": ["Relacional (PostgreSQL/MySQL)", "No-Relacional (MongoDB/Firestore)", "A decidir con la IA"]
+                "options": ["Opción A", "Opción B", "Opción C"]
             }},
             {{
                 "id": "q_features_core",
                 "section": "Producto",
-                "label": "Describe brevemente las 2 funcionalidades más críticas que debe tener el MVP:",
+                "label": "Describe las funcionalidades más críticas que debe tener el MVP:",
                 "type": "text"
             }}
         ]
@@ -2143,40 +2143,12 @@ HISTORIAL DE LA CONVERSACIÓN:
 {chat_history_str}
 
 TU OBJETIVO:
-Extraer y deducir las respuestas más probables para los siguientes parámetros clave de arquitectura.
-Devuelve ÚNICAMENTE un objeto JSON válido con las siguientes claves y selecciona la opción que mejor corresponda basada en la charla (o la sugerencia por defecto más lógica si no se mencionó explícitamente):
+Extraer y deducir las respuestas técnicas más precisas y relevantes discutidas en la charla.
+Devuelve ÚNICAMENTE un objeto JSON donde las claves sean IDs de parámetros (como q_auth, q_database, q_features_core, q_platform, q_language, q_privacy, q_latency, etc.) y los valores sean las decisiones concluidas o deducidas de la charla de forma concisa.
 
-1. "q_auth": Selecciona exactamente uno entre:
-   - "Sin autenticación / Local"
-   - "Email y Contraseña tradicional"
-   - "OAuth Social (Google, GitHub)"
-   - "Magic Links / Passwordless"
-   - "Tokens JWT con Refresh Tokens"
-
-2. "q_database": Selecciona exactamente uno entre:
-   - "Local SQLite / JSON"
-   - "Relacional (PostgreSQL/MySQL)"
-   - "NoSQL (MongoDB/Firestore)"
-   - "Vector DB (Pinecone/Chroma)"
-   - "Sin base de datos (Memoria)"
-
-3. "q_user_roles_client_booking": Resumen breve de los roles y actores identificados (máximo 15 palabras).
-
-4. "q_notifications_strategy": Selecciona exactamente uno entre:
-   - "Sin notificaciones"
-   - "Solo Email"
-   - "WhatsApp y SMS"
-   - "Notificaciones Push Web/Mobile"
-
-5. "q_payment_integration": Selecciona exactamente uno entre:
-   - "No contempla pagos"
-   - "Mercado Pago"
-   - "Stripe"
-   - "Suscripciones Recurrentes"
-
-6. "q_features_core": Resumen sintético del alcance del MVP (máximo 20 palabras).
-
-Devuelve ÚNICAMENTE el objeto JSON sin envolver en bloques de código markdown ni texto adicional.
+Instrucciones:
+- Extrae únicamente parámetros relevantes para el tipo de software discutido (por ejemplo: si es una app local de teclado o CLI, no infieras pasarelas de pago o autenticación JWT si no se mencionaron).
+- Devuelve ÚNICAMENTE el objeto JSON válido sin bloques de código markdown ni texto antes o después.
 """
         response = model.generate_content(prompt)
         cleaned = clean_markdown(response.text.strip())
