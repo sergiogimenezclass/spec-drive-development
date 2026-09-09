@@ -889,7 +889,7 @@ function setupEventListeners() {
     if (closeCopilotBtn) closeCopilotBtn.addEventListener('click', toggleCopilotPanel);
     if (clearCopilotBtn) clearCopilotBtn.addEventListener('click', clearCopilotChat);
     if (sendCopilotBtn) sendCopilotBtn.addEventListener('click', () => sendCopilotMessage());
-    if (exploreFinishWizardBtn) exploreFinishWizardBtn.addEventListener('click', () => exportSpecsToDisk(true));
+    if (exploreFinishWizardBtn) exploreFinishWizardBtn.addEventListener('click', extractAnswersAndLaunchWizard);
 
     // Event Listeners del Selector de Modelo de IA Personalizado (Dropdown UI)
     const triggerBtn = document.getElementById('btn-custom-model-trigger');
