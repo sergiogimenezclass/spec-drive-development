@@ -1205,7 +1205,7 @@ def export_specs(req: SaveProjectRequest, x_gemini_key: Optional[str] = Header(N
     try:
         GENERATION_STATUS["current_filename"] = "architecture.md"
         filepath = os.path.join(specs_dir, "architecture.md")
-        if os.path.exists(filepath) and os.path.getsize(filepath) > 100:
+        if not force_regenerate and os.path.exists(filepath) and os.path.getsize(filepath) > 300:
             logger.info("architecture.md ya existe en disco, reutilizando contenido existente.")
             with open(filepath, "r", encoding="utf-8") as f:
                 save_single_spec("architecture.md", f.read())
@@ -1237,7 +1237,7 @@ def export_specs(req: SaveProjectRequest, x_gemini_key: Optional[str] = Header(N
     try:
         GENERATION_STATUS["current_filename"] = "database.md"
         filepath = os.path.join(specs_dir, "database.md")
-        if os.path.exists(filepath) and os.path.getsize(filepath) > 100:
+        if not force_regenerate and os.path.exists(filepath) and os.path.getsize(filepath) > 300:
             logger.info("database.md ya existe en disco, reutilizando contenido existente.")
             with open(filepath, "r", encoding="utf-8") as f:
                 save_single_spec("database.md", f.read())
@@ -1270,7 +1270,7 @@ def export_specs(req: SaveProjectRequest, x_gemini_key: Optional[str] = Header(N
     try:
         GENERATION_STATUS["current_filename"] = "api.md"
         filepath = os.path.join(specs_dir, "api.md")
-        if os.path.exists(filepath) and os.path.getsize(filepath) > 100:
+        if not force_regenerate and os.path.exists(filepath) and os.path.getsize(filepath) > 300:
             logger.info("api.md ya existe en disco, reutilizando contenido existente.")
             with open(filepath, "r", encoding="utf-8") as f:
                 save_single_spec("api.md", f.read())
@@ -1302,7 +1302,7 @@ def export_specs(req: SaveProjectRequest, x_gemini_key: Optional[str] = Header(N
     try:
         GENERATION_STATUS["current_filename"] = "openapi.json"
         filepath = os.path.join(specs_dir, "openapi.json")
-        if os.path.exists(filepath) and os.path.getsize(filepath) > 100:
+        if not force_regenerate and os.path.exists(filepath) and os.path.getsize(filepath) > 300:
             logger.info("openapi.json ya existe en disco, reutilizando contenido existente.")
             with open(filepath, "r", encoding="utf-8") as f:
                 save_single_spec("openapi.json", f.read())
@@ -1344,7 +1344,7 @@ def export_specs(req: SaveProjectRequest, x_gemini_key: Optional[str] = Header(N
     try:
         GENERATION_STATUS["current_filename"] = "glossary.md"
         filepath = os.path.join(specs_dir, "glossary.md")
-        if os.path.exists(filepath) and os.path.getsize(filepath) > 100:
+        if not force_regenerate and os.path.exists(filepath) and os.path.getsize(filepath) > 300:
             logger.info("glossary.md ya existe en disco, reutilizando contenido existente.")
             with open(filepath, "r", encoding="utf-8") as f:
                 save_single_spec("glossary.md", f.read())
@@ -1372,7 +1372,7 @@ def export_specs(req: SaveProjectRequest, x_gemini_key: Optional[str] = Header(N
     try:
         GENERATION_STATUS["current_filename"] = "agents.md"
         filepath = os.path.join(specs_dir, "agents.md")
-        if os.path.exists(filepath) and os.path.getsize(filepath) > 100:
+        if not force_regenerate and os.path.exists(filepath) and os.path.getsize(filepath) > 300:
             logger.info("agents.md ya existe en disco, reutilizando contenido existente.")
             with open(filepath, "r", encoding="utf-8") as f:
                 save_single_spec("agents.md", f.read())
@@ -1403,197 +1403,136 @@ def export_specs(req: SaveProjectRequest, x_gemini_key: Optional[str] = Header(N
         actors_list = ['Usuario']
     primary_actor = actors_list[0]
 
-    # Plantillas de fallback para los archivos
+    # 5. Generación completa con IA para todos los demás módulos de especificación
     for filename in files_to_generate:
         if check_cancel():
             return {"status": "cancelled", "detail": "Generación cancelada por el usuario."}
+            
         GENERATION_STATUS["current_filename"] = filename
-        content = ""
+        filepath = os.path.join(specs_dir, filename)
         
-        # Si fue generado por la IA, lo usamos
-        if filename in ai_markdowns:
-            content = ai_markdowns[filename]
-        else:
-            # Generar contenido completo por IA si no se generó previamente
-            if filename != "project.md":
+        # Si la especificación ya fue generada arriba o ya existe en disco en modo normal, la respetamos
+        if not force_regenerate and os.path.exists(filepath) and os.path.getsize(filepath) > 300:
+            if filename not in ai_markdowns:
                 try:
-                    logger.info(f"Generando {filename} por IA en export_specs...")
-                    auto_prompt = f"""
-                    Actúa como un Staff Software Architect de nivel mundial.
-                    Redacta el contenido técnico completo en Markdown para el archivo '{filename}' de este proyecto.
-                    
-                    Idea semilla: "{idea}"
-                    Respuestas recopiladas: {json.dumps(answers, ensure_ascii=False)}
-                    Metadatos: {json.dumps(metadata, ensure_ascii=False)}
-                    
-                    INSTRUCCIONES DE DISEÑO:
-                    1. Genera documentación técnica detallada, profesional y estructurada específica para '{filename}'.
-                    2. Si es 'backend.md', detalla la arquitectura de servicios backend, componentes, APIs consumidas o expuestas, manejo de datos y diagramas de flujo.
-                    3. Si es 'frontend.md', detalla componentes UI, vistas, patrones de diseño y flujo de interacción.
-                    4. Si es 'security.md', detalla matrices RBAC, autenticación, protección de datos y OWASP.
-                    5. Si es 'requirements.md', detalla lista completa de RF y RNF categorizados.
-                    6. Si es 'user-stories.md', detalla las historias de usuario con criterios de aceptación (Dado/Cuando/Entonces).
-                    7. Si es 'integrations.md', detalla servicios externos, APIs y webhooks.
-                    8. Si es 'roadmap.md', detalla las fases MVP, V1 y V2.
-                    9. Si es 'tasks.md', detalla la lista estructurada de tareas TODO de desarrollo.
-                    10. Si es 'decisions.md', detalla los Registros de Decisiones de Arquitectura (ADR).
-                    11. DIAGRAMAS MERMAID OBLIGATORIOS: Si incluyes diagramas, DEBES generarlos SIEMPRE en bloques de código Mermaid.js (```mermaid ... ```).
-                    
-                    Devuelve únicamente el contenido Markdown listo para ser guardado. No uses bloques de código ```markdown para envolver todo el archivo.
-                    """
-                    resp = model.generate_content(auto_prompt)
-                    ai_content = clean_markdown(resp.text)
-                    if len(ai_content) > 50:
-                        content = ai_content
-                except Exception as gen_err:
-                    logger.error(f"Error generando {filename} por IA en export_specs: {str(gen_err)}")
+                    with open(filepath, "r", encoding="utf-8") as f:
+                        save_single_spec(filename, f.read())
+                except Exception:
+                    pass
+            continue
+            
+        if filename in ai_markdowns and not force_regenerate:
+            continue
+            
+        # Prompts dedicados de alta precisión para cada especificación técnica
+        prompt_instructions = ""
+        if filename == "backend.md":
+            prompt_instructions = """
+            Genera una especificación técnica completa, exhaustiva y estructurada para 'backend.md' (Lógica de Backend y Arquitectura de Servicios).
+            Debe incluir obligatoriamente:
+            1. Arquitectura del Backend (Patrón Capas: Controllers, Services, Repositories, Middlewares).
+            2. Servicios Core y Reglas de Negocio del Backend para esta aplicación.
+            3. Estrategia de Persistencia, Transacciones de Base de Datos y Caché.
+            4. Manejo de Excepciones Centralizado y Estándares de Logging.
+            5. DIAGRAMA MERMAID OBLIGATORIO: Incluye un diagrama de flujo de procesamiento del backend o secuencia de peticiones en sintaxis Mermaid.js (```mermaid graph TD o sequenceDiagram ... ```).
+            """
+        elif filename == "integrations.md":
+            prompt_instructions = """
+            Genera una especificación técnica completa y estructurada para 'integrations.md' (Integraciones con Servicios de Terceros y APIs Externas).
+            Debe incluir obligatoriamente:
+            1. Listado de Servicios Externos e Integraciones (SDKs, APIs REST/GraphQL, Servicios Cloud, IA/LLM).
+            2. Protocolos de Autenticación con terceros (OAuth2, API Keys, Webhooks con firma HMAC).
+            3. Estrategias de Resiliencia: Reintentos (Exponential Backoff), Circuit Breakers y Manejo de Rate Limits.
+            4. Definición de Contratos de Payload para Webhooks entrantes y salientes.
+            """
+        elif filename == "frontend.md":
+            prompt_instructions = """
+            Genera una especificación técnica completa y estructurada para 'frontend.md' (Arquitectura de Interfaz de Usuario y Frontend).
+            Debe incluir obligatoriamente:
+            1. Arquitectura de Componentes UI y Jerarquía de Vistas/Pantallas.
+            2. Manejo de Estado (Global vs Local, Estrategia de Caché/Re-fetch).
+            3. Sistema de Diseño (Variables CSS, Tipografía, Paleta de colores HSL, Componentes Base).
+            4. Experiencia de Usuario (UX), Animaciones, Microinteracciones y Accesibilidad (WCAG 2.1 AA).
+            5. DIAGRAMA MERMAID OBLIGATORIO: Incluye un mapa de flujo de navegación entre pantallas en sintaxis Mermaid.js (```mermaid graph LR ... ```).
+            """
+        elif filename == "security.md":
+            prompt_instructions = """
+            Genera una especificación técnica completa y estructurada para 'security.md' (Políticas de Seguridad, Autenticación y Control de Acceso).
+            Debe incluir obligatoriamente:
+            1. Modelo de Autenticación y Gestión de Sesiones (JWT / OAuth2 / Tokens de Refresco).
+            2. Matriz de Control de Acceso Basado en Roles (RBAC: Roles, Permisos y Middleware).
+            3. Protección de Datos Cifrados (Datos en tránsito TLS 1.3 y Datos en reposo AES-256).
+            4. Mitigaciones contra las Top 10 Amenazas de OWASP (SQL Injection, XSS, CSRF, Rate Limiting).
+            5. Auditoría de Eventos de Seguridad y Logs de Acceso.
+            """
+        elif filename == "requirements.md":
+            prompt_instructions = """
+            Genera una especificación de requisitos completa y estructurada para 'requirements.md'.
+            Debe incluir obligatoriamente:
+            1. Lista exhaustiva de Requisitos Funcionales (RF-01 a RF-15) clasificados por módulo de la aplicación.
+            2. Lista exhaustiva de Requisitos No Funcionales (RNF-01 a RNF-10) de Rendimiento, Escala, Seguridad y Disponibilidad.
+            3. Criterios de Aceptación Técnicos Globales.
+            """
+        elif filename == "user-stories.md":
+            prompt_instructions = """
+            Genera una especificación técnica de Historias de Usuario completas para 'user-stories.md'.
+            Debe incluir obligatoriamente:
+            1. Historias de Usuario en formato estándar: "Como [Actor], quiero [Acción] para [Beneficio]".
+            2. Criterios de Aceptación detallados en formato Given/When/Then (Dado que/Cuando/Entonces) para cada historia.
+            3. Casos de Borde e Historias de Error o Fallo.
+            """
+        elif filename == "roadmap.md":
+            prompt_instructions = """
+            Genera la hoja de ruta técnica completa para 'roadmap.md'.
+            Debe incluir obligatoriamente:
+            1. Fase 1: Producto Mínimo Viable (MVP) y alcance esencial.
+            2. Fase 2: Versión 1.0 (Optimizaciones y Features secundarias).
+            3. Fase 3: Versión 2.0 (Escala, Analíticas e Integraciones avanzadas).
+            4. Hitos Críticos y Entregables Clave por Fase.
+            """
+        elif filename == "tasks.md":
+            prompt_instructions = """
+            Genera la lista estructurada de tareas de desarrollo TODO en Markdown para 'tasks.md'.
+            Debe incluir obligatoriamente:
+            1. Tareas TODO organizadas por componentes: [-] Infraestructura & DB, [-] Backend APIs, [-] Frontend UI, [-] Integraciones & Seguridad, [-] Testing & QA.
+            2. Formato de checkboxes de Markdown (- [ ] Tarea pendiente).
+            """
+        elif filename == "decisions.md":
+            prompt_instructions = """
+            Genera el Registro de Decisiones de Arquitectura para 'decisions.md' (ADRs).
+            Debe incluir obligatoriamente:
+            1. Al menos 3 Registros ADR completos (ADR-01, ADR-02, ADR-03) con formato: Título, Estatus (Aceptado), Contexto, Decisión Tomada y Consecuencias Técnicas.
+            """
+        elif filename == "project.md":
+            prompt_instructions = """
+            Genera el resumen ejecutivo del proyecto en 'project.md'.
+            Debe incluir: Visión General, Resumen del Stack Tecnológico, Objetivos Clave y Tabla Resumen de Respuestas recopiladas.
+            """
+        else:
+            prompt_instructions = f"Genera la especificación técnica completa y profesional en Markdown para '{filename}'."
 
-            # Fallback o generación basada en reglas si falla la IA
-            if not content:
-                if filename == "project.md":
-                    content = f"""# Ficha Técnica del Proyecto: {project.get('name', 'Proyecto Spec-First')}
- 
- ## Información General
- *   **Idea Semilla:** {idea}
- *   **Dominio:** {metadata.get('domain', 'No especificado')}
- *   **Tipo de Producto:** {metadata.get('productType', 'No especificado')}
- *   **Actores Detectados:** {", ".join(actors_list)}
- 
- ## Resumen de Respuestas clave
- {chr(10).join([f"*   **{k}:** {v}" for k, v in answers.items()])}
- 
- ---
- *Documento generado automáticamente por [Spec IDE](file://{os.path.abspath(__file__)}).*
- """
-            elif filename == "requirements.md":
-                content = f"""# Requisitos Funcionales y No Funcionales
- 
- ## Requisitos Funcionales (RF)
- A partir de la idea: *{idea}*
- *   **RF-01 (Autenticación):** El sistema debe permitir a los actores ({", ".join(actors_list)}) iniciar sesión de forma segura.
- *   **RF-02 (Core):** El sistema debe resolver la problemática central: "{idea}".
- *   **RF-03 (Administración):** Se debe proveer un panel de control para gestionar recursos.
- 
- ## Requisitos No Funcionales (RNF)
- *   **RNF-01 (Seguridad):** Cifrado de datos en tránsito (TLS/HTTPS).
- *   **RNF-02 (Rendimiento):** Tiempos de respuesta del backend inferiores a 300ms para endpoints CRUD.
- *   **RNF-03 (Usabilidad):** Interfaz fluida y accesible que cumpla con los estándares WCAG 2.1 AA.
- """
-            elif filename == "user-stories.md":
-                content = f"""# Historias de Usuario (Specs)
- 
- ## Historia 1: Acceso al Sistema
- **Como** {primary_actor}  
- **Quiero** ingresar con mis credenciales al sistema  
- **Para** poder acceder a mis recursos privados.
- 
- *   **Criterio de Aceptación 1:** Dado un usuario no registrado, cuando intenta ingresar, el sistema debe mostrar un error de credenciales.
- *   **Criterio de Aceptación 2:** Dado un usuario registrado, cuando ingresa credenciales válidas, es redirigido al panel de control.
- 
- ## Historia 2: Ejecución del Core
- **Como** {primary_actor}  
- **Quiero** interactuar con la funcionalidad principal del software  
- **Para** resolver mi necesidad de negocio.
- """
-            elif filename == "frontend.md":
-                content = f"""# Especificación Frontend
- 
- ## Vistas del Sistema
- 1.  **Vista de Autenticación (Login):** Formulario limpio y accesible.
- 2.  **Dashboard Principal:** Vista de datos generales y accesos rápidos.
- 3.  **Detalle del Core:** Interfaz para interactuar con la lógica principal.
- 
- ## Estándares de Estilo
- *   **Tema:** Soporte de tema oscuro/claro.
- *   **Alineación:** Diseño fluido y mobile-first.
- """
-            elif filename == "backend.md":
-                content = f"""# Especificación Backend
- 
- ## Componentes y Servicios
- *   **Servicio de API REST:** Procesa las solicitudes del frontend.
- *   **Módulo de Base de Datos:** Capa de acceso a datos (ORM o consultas optimizadas).
- *   **Capa de Autenticación:** Validación de tokens JWT / Sesiones.
- """
-            elif filename == "security.md":
-                content = f"""# Políticas de Seguridad y Roles
- 
- ## Matriz de Control de Acceso (RBAC)
- *   **Roles:** {", ".join(actors_list)}
- *   **Políticas:**
-     *   Cada rol tiene permisos limitados a sus propios recursos.
-     *   Los administradores pueden gestionar todos los recursos.
- """
-            elif filename == "integrations.md":
-                content = f"""# Integraciones con Servicios de Terceros
- 
- ## Servicios Identificados
- *   **IA / LLM:** Google Gemini API (para flujos asistidos).
- *   **Otros servicios:** A definir en las fases de desarrollo avanzadas.
- """
-            elif filename == "roadmap.md":
-                content = f"""# Planificación de Fases y Roadmap
- 
- ## Fase 1: Producto Mínimo Viable (MVP)
- *   Implementación del núcleo de la idea: "{idea}"
- *   Autenticación básica de usuarios.
- 
- ## Fase 2: Robustez y Escalabilidad (V1)
- *   Integraciones avanzadas de seguridad y analíticas.
- *   Optimización de base de datos.
- """
-            elif filename == "tasks.md":
-                content = f"""# Lista de Tareas de Desarrollo (TODOs)
- 
- - [ ] **Configurar Base de Datos** e infraestructura inicial.
- - [ ] **Implementar Autenticación** y manejo de sesiones.
- - [ ] **Desarrollar el Flujo Principal** para: *{idea}*.
- - [ ] **Realizar Pruebas de Integración** y QA.
- """
-            elif filename == "decisions.md":
-                content = f"""# Registro de Decisiones de Arquitectura (ADR)
- 
- ## ADR-01: Uso de API de Gemini para Refinamiento
- *   **Estatus:** Aceptado
- *   **Contexto:** Necesitamos un descubrimiento inteligente de requisitos.
- *   **Decisión:** Integrar Gemini para generar preguntas condicionales y pre-escribir las specs.
- *   **Consecuencias:** Mayor velocidad de diseño y consistencia técnica inicial.
- """
-            elif filename == "glossary.md":
-                content = f"""# Glosario de Términos
- 
- *   **MVP:** Minimum Viable Product (Producto Mínimo Viable).
- *   **Spec IDE:** Entorno de especificaciones técnicas interactivas.
- *   **SSOT:** Single Source of Truth (Fuente única de verdad).
- """
-            elif filename == "agents.md":
-                content = f"""# Instrucciones para Agentes de Código (System Prompts)
- 
- Este archivo sirve como prompt del sistema para herramientas como Cursor, Cline, Aider o Roo Code.
- 
- ```text
- Actúa como un desarrollador experto que va a implementar el proyecto.
- Tu fuente única de verdad es la carpeta /specs del proyecto.
- No escribas código que contradiga las definiciones en:
- - architecture.md
- - database.md
- - api.md
- ```
- """
-            elif filename == "openapi.json":
-                content = json.dumps({
-                    "openapi": "3.0.0",
-                    "info": {
-                        "title": project.get("name", "Proyecto Spec-First") + " API",
-                        "version": "1.0.0",
-                        "description": f"Especificación de API para {idea}"
-                    },
-                    "paths": {}
-                }, indent=2)
+        try:
+            logger.info(f"Generando especificación completa por IA: {filename}...")
+            file_prompt = f"""
+            Eres un Staff Software Architect e Ingeniero Principal de nivel mundial.
+            {prompt_instructions}
+            
+            Idea del proyecto: "{idea}"
+            Respuestas recopiladas: {json.dumps(answers, ensure_ascii=False)}
+            Metadatos: {json.dumps(metadata, ensure_ascii=False)}
+            Conversación y contexto relevante:
+            {chat_history_summary}
+            
+            Devuelve ÚNICAMENTE el contenido Markdown listo para ser guardado. Queda prohibido devolver respuestas de 5 líneas o plantillas vacías. Genera documentación técnica detallada e integral. No uses bloques ```markdown para envolver el archivo.
+            """
+            resp = model.generate_content(file_prompt)
+            ai_content = clean_markdown(resp.text)
+            if len(ai_content) > 100:
+                save_single_spec(filename, ai_content)
             else:
-                content = f"# Especificación: {filename.replace('.md', '').replace('.json', '').capitalize()}\n\nContenido pendiente de refinamiento por el usuario."
-        
-        save_single_spec(filename, content)
+                logger.warning(f"Respuesta de IA para {filename} muy corta, reintentando...")
+        except Exception as gen_err:
+            logger.error(f"Error generando {filename} con IA en export_specs: {str(gen_err)}")
             
     # Guardar el proyecto con los specModules cargados en project.json
     try:
