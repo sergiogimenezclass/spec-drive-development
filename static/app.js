@@ -2132,6 +2132,22 @@ async function exportSpecsToDisk(forceRegenerate = false) {
         return;
     }
     
+    // Cambiar a la pantalla de progreso animado
+    showScreen('screen-discovery');
+    const discoveryLoader = document.getElementById('discovery-loader');
+    const wizardContainer = document.getElementById('wizard-container');
+    const statusTextEl = document.getElementById('loader-status-text');
+    const progressContainer = document.getElementById('loader-progress-container');
+    
+    if (discoveryLoader) discoveryLoader.classList.remove('hidden');
+    if (wizardContainer) wizardContainer.classList.add('hidden');
+    if (progressContainer) progressContainer.classList.remove('hidden');
+    if (statusTextEl) {
+        statusTextEl.innerText = forceRegenerate 
+            ? "Gemini está redactando los 17 archivos de especificación desde cero..." 
+            : "Compilando especificaciones en /specs...";
+    }
+    
     showToast(forceRegenerate ? "Redactando y regenerando los 17 archivos de especificación con IA..." : "Redactando y compilando archivos en /specs...", "info");
     await saveProjectToServer();
     startPollingGenerationStatus();
@@ -2160,12 +2176,14 @@ async function exportSpecsToDisk(forceRegenerate = false) {
             showToast("Especificaciones redactadas y guardadas con éxito en la carpeta del proyecto", "success");
             loadWorkspace();
         } else {
-            showToast("Hubo un error al generar las especificaciones", "error");
+            showToast(data.detail || "Hubo un error al generar las especificaciones", "error");
+            loadWorkspace();
         }
     } catch (e) {
         stopPollingGenerationStatus();
         console.error(e);
         showToast("Error al exportar especificaciones", "error");
+        loadWorkspace();
     }
 }
 
