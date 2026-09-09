@@ -749,19 +749,21 @@ def next_questions(req: NextQuestionsRequest, x_gemini_key: Optional[str] = Head
     
     prompt = f"""
     Eres un Tech Lead e Ingeniero de Requisitos.
-    Analiza la idea del proyecto y las respuestas actuales del usuario, y genera un conjunto dinámico de 3 a 5 preguntas adicionales más profundas para completar las secciones técnicas (Arquitectura, Base de datos, API, Seguridad, UX, etc.).
+    Analiza la idea del proyecto y las respuestas dadas hasta el momento, y genera entre 2 y 3 preguntas de profundización estrictamente relevantes para los aspectos técnicos pendientes de este proyecto (asegurando un total acumulado máximo de 5 a 6 preguntas en todo el flujo).
     
     Idea del proyecto: "{req.idea}"
     Respuestas actuales: {json.dumps(req.answers, ensure_ascii=False)}
     
-    Genera preguntas condicionales según el contexto (por ejemplo, si mencionan cobros pregunta por pasarelas, si mencionan roles pregunta por permisos, si mencionan datos masivos pregunta por escalabilidad o base de datos).
+    Reglas:
+    - NO repitas temas ya aclarados en las respuestas actuales.
+    - Las preguntas deben ser condicionales al contexto real de este software.
     
     Devuelve ÚNICAMENTE un objeto JSON con la siguiente estructura (sin markdown, solo el JSON):
     {{
         "questions": [
             {{
                 "id": "id_pregunta_unica",
-                "section": "Nombre de la sección (ej. API, Base de datos, Calidad)",
+                "section": "Nombre de la sección (ej. API, Rendimiento, Seguridad, Calidad)",
                 "label": "Texto de la pregunta",
                 "type": "text | select | boolean",
                 "options": ["Opción 1", "Opción 2"] // Solo si el tipo es select
