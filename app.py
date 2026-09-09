@@ -1942,6 +1942,8 @@ def copilot_chat(req: CopilotChatRequest, x_gemini_key: Optional[str] = Header(N
         else:
             specs_summary_text = "\n\n".join(specs_summary)
 
+        local_docs_summary = get_local_project_docs_summary()
+
         system_instruction = f"""Eres el "Spec Copilot", un Arquitecto de Software y Product Owner experimentado que conversa sobre el proyecto "{proj_name}".
 
 OBJETIVO:
@@ -1951,6 +1953,7 @@ INFORMACIÓN DEL PROYECTO:
 - Nombre: {proj_name}
 - Idea General: {seed_idea}
 - Respuestas del Wizard: {json.dumps(answers, ensure_ascii=False)}
+{local_docs_summary}
 
 DOCUMENTOS DE ESPECIFICACIÓN DISPONIBLES:
 {specs_summary_text}
@@ -1958,9 +1961,10 @@ DOCUMENTOS DE ESPECIFICACIÓN DISPONIBLES:
 REGLAS DE RESPUESTA:
 1. Responde de forma clara, directa y estructurada en Markdown (usa títulos breves, viñetas, bloques de código SQL/JSON/JS cuando aporte valor).
 2. Cita siempre el documento de origen cuando menciones detalles específicos (ejemplo: [product.md], [architecture.md], [database.md], etc.).
-3. Si el usuario te pide un resumen alto nivel, sé sintético y resalta el propósito del proyecto, la arquitectura propuesta y la pila tecnológica.
-4. Mantén un tono profesional, servicial y experto.
-5. SI EL USUARIO TE PIDE CREAR, GENERAR O IMPLEMENTAR UNA NUEVA FUNCIONALIDAD/FEATURE (O CREAR SUS ARCHIVOS .MD):
+3. Si en el proyecto existen documentos locales escaneados (mostrados arriba), ÚSALOS e intégralos activamente en tu respuesta. NUNCA digas que no tienes acceso a los archivos si ya se muestran escaneados.
+4. Si el usuario te pide un resumen alto nivel, sé sintético y resalta el propósito del proyecto, la arquitectura propuesta y la pila tecnológica.
+5. Mantén un tono profesional, servicial y experto.
+6. SI EL USUARIO TE PIDE CREAR, GENERAR O IMPLEMENTAR UNA NUEVA FUNCIONALIDAD/FEATURE (O CREAR SUS ARCHIVOS .MD):
    - Explica brevemente la solución arquitectónica.
    - AL FINAL DE TU RESPUESTA, incluye obligatoriamente una etiqueta con este formato JSON exacto en una sola línea (reemplazando con los valores apropiados):
      <!-- GENERATE_FEATURE: {{"name": "Nombre de la Feature", "folder": "nombre-carpeta", "description": "Breve descripcion de la feature"}} -->
@@ -2035,6 +2039,8 @@ def copilot_chat_stream(req: CopilotChatRequest, x_gemini_key: Optional[str] = H
 
             specs_summary_text = "\n\n".join(specs_summary) if specs_summary else "Aún no hay archivos de especificación (.md) completos. Solo se cuenta con la idea semilla."
 
+            local_docs_summary = get_local_project_docs_summary()
+
             system_instruction = f"""Eres el "Spec Copilot", un Arquitecto de Software y Product Owner experimentado que conversa sobre el proyecto "{proj_name}".
 
 OBJETIVO:
@@ -2044,6 +2050,7 @@ INFORMACIÓN DEL PROYECTO:
 - Nombre: {proj_name}
 - Idea General: {seed_idea}
 - Respuestas del Wizard: {json.dumps(answers, ensure_ascii=False)}
+{local_docs_summary}
 
 DOCUMENTOS DE ESPECIFICACIÓN DISPONIBLES:
 {specs_summary_text}
@@ -2052,9 +2059,10 @@ REGLAS DE RESPUESTA:
 1. Responde de forma clara, directa y estructurada en Markdown (usa títulos breves, viñetas, bloques de código SQL/JSON/JS cuando aporte valor).
 2. Cita siempre el documento de origen cuando menciones detalles específicos (ejemplo: [product.md], [architecture.md], [database.md], etc.).
 3. DIAGRAMAS Y GRÁFICOS: Si incluyes o el usuario te pide esquemas de arquitectura, modelos de base de datos, flujos de usuario o secuencias de API, DEBES generarlos SIEMPRE en bloques de código Mermaid.js (bloque ```mermaid ... ```). NUNCA utilices texto ASCII plano o gráficos de texto para diagramas.
-4. Si el usuario te pide un resumen alto nivel, sé sintético y resalta el propósito del proyecto, la arquitectura propuesta y la pila tecnológica.
-5. Mantén un tono profesional, servicial y experto.
-6. SI EL USUARIO TE PIDE CREAR, GENERAR O IMPLEMENTAR UNA NUEVA FUNCIONALIDAD/FEATURE (O CREAR SUS ARCHIVOS .MD):
+4. Si en el proyecto existen documentos locales escaneados (mostrados arriba), ÚSALOS e intégralos activamente en tu respuesta. NUNCA digas que no tienes acceso a los archivos si ya se muestran escaneados.
+5. Si el usuario te pide un resumen alto nivel, sé sintético y resalta el propósito del proyecto, la arquitectura propuesta y la pila tecnológica.
+6. Mantén un tono profesional, servicial y experto.
+7. SI EL USUARIO TE PIDE CREAR, GENERAR O IMPLEMENTAR UNA NUEVA FUNCIONALIDAD/FEATURE (O CREAR SUS ARCHIVOS .MD):
    - Explica brevemente la solución arquitectónica.
    - AL FINAL DE TU RESPUESTA, incluye obligatoriamente una etiqueta con este formato JSON exacto en una sola línea (reemplazando con los valores apropiados):
      <!-- GENERATE_FEATURE: {{"name": "Nombre de la Feature", "folder": "nombre-carpeta", "description": "Breve descripcion de la feature"}} -->
