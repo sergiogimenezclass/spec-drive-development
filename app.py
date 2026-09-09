@@ -1163,247 +1163,7 @@ def export_specs(req: SaveProjectRequest, x_gemini_key: Optional[str] = Header(N
             return True
         return False
 
-    # 1. Generar product.md
-    if check_cancel():
-        return {"status": "cancelled", "detail": "Generación cancelada por el usuario."}
-    try:
-        GENERATION_STATUS["current_filename"] = "product.md"
-        filepath = os.path.join(specs_dir, "product.md")
-        if not force_regenerate and os.path.exists(filepath) and os.path.getsize(filepath) > 100:
-            logger.info("product.md ya existe en disco, reutilizando contenido existente.")
-            with open(filepath, "r", encoding="utf-8") as f:
-                save_single_spec("product.md", f.read())
-        else:
-            prod_prompt = f"""
-            Eres un Staff Software Architect y Product Designer.
-            Genera el contenido completo en formato Markdown para el archivo 'product.md'.
-            Debe incluir:
-            1. Visión General del Producto y Propuesta de Valor.
-            2. Objetivos de Negocio y Métricas de Éxito.
-            3. Usuarios, Actores y sus Roles detallados.
-            4. Reglas de Negocio Críticas e Inquebrantables.
-            5. Casos de Uso principales e Historias clave.
-            6. DIAGRAMA MERMAID OBLIGATORIO: Incluye al menos un diagrama de flujo o mapa visual de navegación del usuario en sintaxis Mermaid.js (```mermaid graph TD ... ```).
-            
-            Basándote en la idea del proyecto: "{idea}"
-            Respuestas recopiladas: {json.dumps(answers, ensure_ascii=False)}
-            Metadatos: {json.dumps(metadata, ensure_ascii=False)}
-            Conversación previa en el chat:
-            {chat_history_summary}
-            
-            Devuelve únicamente el contenido Markdown listo para ser guardado. No utilices bloques ```markdown para envolver tu respuesta.
-            """
-            logger.info("Generando product.md por IA...")
-            resp = model.generate_content(prod_prompt)
-            save_single_spec("product.md", resp.text)
-    except Exception as e:
-        logger.error(f"Error generando product.md por IA: {str(e)}")
-
-    # 2. architecture.md
-    if check_cancel():
-        return {"status": "cancelled", "detail": "Generación cancelada por el usuario."}
-    try:
-        GENERATION_STATUS["current_filename"] = "architecture.md"
-        filepath = os.path.join(specs_dir, "architecture.md")
-        if not force_regenerate and os.path.exists(filepath) and os.path.getsize(filepath) > 300:
-            logger.info("architecture.md ya existe en disco, reutilizando contenido existente.")
-            with open(filepath, "r", encoding="utf-8") as f:
-                save_single_spec("architecture.md", f.read())
-        else:
-            arch_prompt = f"""
-            Eres un Arquitecto de Software experto.
-            Genera el contenido completo en formato Markdown para el archivo 'architecture.md'.
-            Debe incluir:
-            1. Pila Tecnológica Propuesta (Frontend, Backend, Base de Datos, Servidor) y su justificación.
-            2. Decisiones de Diseño Clave e Infraestructura (Conceptos de despliegue).
-            3. Estructura de Módulos del Sistema y Flujo de Datos.
-            4. DIAGRAMA MERMAID OBLIGATORIO: Incluye un diagrama conceptual completo de la arquitectura del sistema y flujo de componentes en sintaxis Mermaid.js (bloque ```mermaid graph TD ... ```). Queda estrictamente prohibido usar gráficos en texto ASCII plano.
-            
-            Basándote en la idea del proyecto: "{idea}"
-            y las respuestas recopiladas: {json.dumps(answers, ensure_ascii=False)}
-            y metadatos: {json.dumps(metadata, ensure_ascii=False)}
-            
-            Devuelve únicamente el contenido Markdown listo para ser guardado. No utilices bloques de código Markdown (como ```markdown) para envolver tu respuesta.
-            """
-            logger.info("Generando architecture.md por IA...")
-            resp = model.generate_content(arch_prompt)
-            save_single_spec("architecture.md", resp.text)
-    except Exception as e:
-        logger.error(f"Error generando architecture.md por IA: {str(e)}")
-
-    # 3. database.md
-    if check_cancel():
-        return {"status": "cancelled", "detail": "Generación cancelada por el usuario."}
-    try:
-        GENERATION_STATUS["current_filename"] = "database.md"
-        filepath = os.path.join(specs_dir, "database.md")
-        if not force_regenerate and os.path.exists(filepath) and os.path.getsize(filepath) > 300:
-            logger.info("database.md ya existe en disco, reutilizando contenido existente.")
-            with open(filepath, "r", encoding="utf-8") as f:
-                save_single_spec("database.md", f.read())
-        else:
-            db_prompt = f"""
-            Eres un Ingeniero de Base de Datos experto.
-            Genera el contenido completo en formato Markdown para el archivo 'database.md'.
-            Debe incluir:
-            1. Diseño Conceptual del Modelo de Datos.
-            2. DIAGRAMA MERMAID OBLIGATORIO: Incluye un diagrama de Entidad-Relación completo escrito exclusivamente en sintaxis Mermaid.js (bloque ```mermaid erDiagram ... ``` con entidades, atributos principales y cardinalidad de relaciones). Queda estrictamente prohibido usar gráficos en texto ASCII plano.
-            3. Listado de Entidades principales con sus atributos (tipos de datos) y relaciones.
-            4. Esquema físico completo escrito en sintaxis Prisma DSL (un bloque de código schema.prisma completo y listo para copiar).
-            5. Índices, restricciones o consideraciones de rendimiento.
-            
-            Basándote en la idea del proyecto: "{idea}"
-            y las respuestas recopiladas: {json.dumps(answers, ensure_ascii=False)}
-            y metadatos: {json.dumps(metadata, ensure_ascii=False)}
-            
-            Devuelve únicamente el contenido Markdown listo para ser guardado. No utilices bloques de código Markdown (como ```markdown) para envolver tu respuesta.
-            """
-            logger.info("Generando database.md por IA...")
-            resp = model.generate_content(db_prompt)
-            save_single_spec("database.md", resp.text)
-    except Exception as e:
-        logger.error(f"Error generando database.md por IA: {str(e)}")
-
-    # 4. api.md
-    if check_cancel():
-        return {"status": "cancelled", "detail": "Generación cancelada por el usuario."}
-    try:
-        GENERATION_STATUS["current_filename"] = "api.md"
-        filepath = os.path.join(specs_dir, "api.md")
-        if not force_regenerate and os.path.exists(filepath) and os.path.getsize(filepath) > 300:
-            logger.info("api.md ya existe en disco, reutilizando contenido existente.")
-            with open(filepath, "r", encoding="utf-8") as f:
-                save_single_spec("api.md", f.read())
-        else:
-            api_prompt = f"""
-            Eres un Diseñador de APIs RESTful experto.
-            Genera el contenido completo en formato Markdown para el archivo 'api.md'.
-            Debe incluir:
-            1. Protocolo de Comunicación, Autenticación y Manejo de Sesiones.
-            2. DIAGRAMA MERMAID OBLIGATORIO: Incluye un diagrama de secuencia del flujo de peticiones/respuestas o autenticación en sintaxis Mermaid.js (bloque ```mermaid sequenceDiagram ... ```). Queda estrictamente prohibido usar gráficos en texto ASCII plano.
-            3. Listado de Endpoints clave (Rutas, Métodos HTTP, Payloads de petición y respuesta esperados).
-            4. Estructura de errores comunes.
-            
-            Basándote en la idea del proyecto: "{idea}"
-            y las respuestas recopiladas: {json.dumps(answers, ensure_ascii=False)}
-            y metadatos: {json.dumps(metadata, ensure_ascii=False)}
-            
-            Devuelve únicamente el contenido Markdown listo para ser guardado. No utilices bloques de código Markdown (como ```markdown) para envolver tu respuesta.
-            """
-            logger.info("Generando api.md por IA...")
-            resp = model.generate_content(api_prompt)
-            save_single_spec("api.md", resp.text)
-    except Exception as e:
-        logger.error(f"Error generando api.md por IA: {str(e)}")
-
-    # 4b. openapi.json
-    if check_cancel():
-        return {"status": "cancelled", "detail": "Generación cancelada por el usuario."}
-    try:
-        GENERATION_STATUS["current_filename"] = "openapi.json"
-        filepath = os.path.join(specs_dir, "openapi.json")
-        if not force_regenerate and os.path.exists(filepath) and os.path.getsize(filepath) > 300:
-            logger.info("openapi.json ya existe en disco, reutilizando contenido existente.")
-            with open(filepath, "r", encoding="utf-8") as f:
-                save_single_spec("openapi.json", f.read())
-        else:
-            api_json_prompt = f"""
-            Eres un Diseñador de APIs RESTful experto.
-            Genera una especificación OpenAPI 3.0 completa en formato JSON para el proyecto.
-            Debe describir todos los endpoints clave (autenticación, recursos principales del dominio).
-            Asegúrate de devolver ÚNICAMENTE el código JSON válido. No utilices bloques de código Markdown (como ```json) para envolver tu respuesta.
-            
-            Basándote en la idea del proyecto: "{idea}"
-            y las respuestas recopiladas: {json.dumps(answers, ensure_ascii=False)}
-            y metadatos: {json.dumps(metadata, ensure_ascii=False)}
-            """
-            logger.info("Generando openapi.json por IA...")
-            resp = model.generate_content(api_json_prompt)
-            json_content = clean_markdown(resp.text)
-            try:
-                json.loads(json_content)
-                save_single_spec("openapi.json", json_content)
-            except Exception as json_err:
-                logger.error(f"El JSON generado para openapi.json no es válido: {str(json_err)}")
-                default_json = json.dumps({
-                    "openapi": "3.0.0",
-                    "info": {
-                        "title": project.get("name", "Proyecto Spec-First") + " API",
-                        "version": "1.0.0",
-                        "description": f"Especificación de API generada automáticamente para {idea}"
-                    },
-                    "paths": {}
-                }, indent=2)
-                save_single_spec("openapi.json", default_json)
-    except Exception as e:
-        logger.error(f"Error generando openapi.json por IA: {str(e)}")
-
-    # 4c. glossary.md
-    if check_cancel():
-        return {"status": "cancelled", "detail": "Generación cancelada por el usuario."}
-    try:
-        GENERATION_STATUS["current_filename"] = "glossary.md"
-        filepath = os.path.join(specs_dir, "glossary.md")
-        if not force_regenerate and os.path.exists(filepath) and os.path.getsize(filepath) > 300:
-            logger.info("glossary.md ya existe en disco, reutilizando contenido existente.")
-            with open(filepath, "r", encoding="utf-8") as f:
-                save_single_spec("glossary.md", f.read())
-        else:
-            glossary_prompt = f"""
-            Eres un Ingeniero de Software experto.
-            Genera el contenido completo en formato Markdown para el archivo 'glossary.md'.
-            Debe incluir un glosario de términos del dominio del proyecto, con su traducción del Español al Inglés técnico sugerido para las variables del código, base de datos y endpoints (por ejemplo: Almacén: Warehouse, Existencias: Stock, etc.), asegurando coherencia conceptual y terminológica en todo el equipo.
-            
-            Basándote en la idea del proyecto: "{idea}"
-            y las respuestas recopiladas: {json.dumps(answers, ensure_ascii=False)}
-            y metadatos: {json.dumps(metadata, ensure_ascii=False)}
-            
-            Devuelve únicamente el contenido Markdown listo para ser guardado. No utilices bloques de código Markdown (como ```markdown) para envolver tu respuesta.
-            """
-            logger.info("Generando glossary.md por IA...")
-            resp = model.generate_content(glossary_prompt)
-            save_single_spec("glossary.md", resp.text)
-    except Exception as e:
-        logger.error(f"Error generando glossary.md por IA: {str(e)}")
-
-    # 4d. agents.md
-    if check_cancel():
-        return {"status": "cancelled", "detail": "Generación cancelada por el usuario."}
-    try:
-        GENERATION_STATUS["current_filename"] = "agents.md"
-        filepath = os.path.join(specs_dir, "agents.md")
-        if not force_regenerate and os.path.exists(filepath) and os.path.getsize(filepath) > 300:
-            logger.info("agents.md ya existe en disco, reutilizando contenido existente.")
-            with open(filepath, "r", encoding="utf-8") as f:
-                save_single_spec("agents.md", f.read())
-        else:
-            agents_prompt = f"""
-            Eres un Staff Software Architect.
-            Genera el contenido completo en formato Markdown para el archivo 'agents.md' (Instrucciones para Agentes de Código de IA).
-            Debe incluir:
-            1. Contexto básico de la aplicación para el agente.
-            2. Estilos de codificación explícitos (ej. camelCase en TypeScript, PascalCase en clases, etc.).
-            3. Reglas Técnicas de Comportamiento Crítico (ej. usar transacciones de base de datos para modificaciones financieras/inventario, usar middleware centralizado de errores, prohibir librerías no aprobadas, etc.).
-            4. Indicación de que su fuente única de verdad (SSOT) son las especificaciones de esta carpeta.
-            
-            Basándote en la idea del proyecto: "{idea}"
-            y las respuestas recopiladas: {json.dumps(answers, ensure_ascii=False)}
-            y metadatos: {json.dumps(metadata, ensure_ascii=False)}
-            
-            Devuelve únicamente el contenido Markdown listo para ser guardado. No utilices bloques de código Markdown (como ```markdown) para envolver tu respuesta.
-            """
-            logger.info("Generando agents.md por IA...")
-            resp = model.generate_content(agents_prompt)
-            save_single_spec("agents.md", resp.text)
-    except Exception as e:
-        logger.error(f"Error generando agents.md por IA: {str(e)}")
-        
-    actors_list = [a for a in metadata.get('actors', []) if a]
-    if not actors_list:
-        actors_list = ['Usuario']
-    primary_actor = actors_list[0]
-
-    # 5. Generación completa con IA para todos los demás módulos de especificación
+    # Loop único y ordenado para generar las 17 especificaciones técnicas sin duplicados
     for filename in files_to_generate:
         if check_cancel():
             return {"status": "cancelled", "detail": "Generación cancelada por el usuario."}
@@ -1411,22 +1171,64 @@ def export_specs(req: SaveProjectRequest, x_gemini_key: Optional[str] = Header(N
         GENERATION_STATUS["current_filename"] = filename
         filepath = os.path.join(specs_dir, filename)
         
-        # Si la especificación ya fue generada arriba o ya existe en disco en modo normal, la respetamos
+        # Si la especificación ya existe en disco y NO se solicitó forzar la regeneración, la reutilizamos
         if not force_regenerate and os.path.exists(filepath) and os.path.getsize(filepath) > 300:
-            if filename not in ai_markdowns:
-                try:
-                    with open(filepath, "r", encoding="utf-8") as f:
-                        save_single_spec(filename, f.read())
-                except Exception:
-                    pass
-            continue
-            
-        if filename in ai_markdowns and not force_regenerate:
+            logger.info(f"{filename} ya existe en disco (>300B), reutilizando contenido.")
+            try:
+                with open(filepath, "r", encoding="utf-8") as f:
+                    save_single_spec(filename, f.read())
+            except Exception as read_err:
+                logger.error(f"Error leyendo {filename} de disco: {str(read_err)}")
             continue
             
         # Prompts dedicados de alta precisión para cada especificación técnica
         prompt_instructions = ""
-        if filename == "backend.md":
+        if filename == "product.md":
+            prompt_instructions = """
+            Genera el contenido completo en formato Markdown para 'product.md' (Visión del Producto y Reglas de Negocio).
+            Debe incluir:
+            1. Visión General del Producto y Propuesta de Valor.
+            2. Objetivos de Negocio y Métricas de Éxito.
+            3. Usuarios, Actores y sus Roles detallados.
+            4. Reglas de Negocio Críticas e Inquebrantables.
+            5. Casos de Uso principales e Historias clave.
+            6. DIAGRAMA MERMAID OBLIGATORIO: Incluye al menos un diagrama de flujo o mapa visual de navegación del usuario en sintaxis Mermaid.js (```mermaid graph TD ... ```).
+            """
+        elif filename == "architecture.md":
+            prompt_instructions = """
+            Genera el contenido completo en formato Markdown para 'architecture.md' (Arquitectura del Sistema).
+            Debe incluir:
+            1. Pila Tecnológica Propuesta (Frontend, Backend, Base de Datos, Servidor) y su justificación.
+            2. Decisiones de Diseño Clave e Infraestructura.
+            3. Estructura de Módulos del Sistema y Flujo de Datos.
+            4. DIAGRAMA MERMAID OBLIGATORIO: Incluye un diagrama conceptual completo de la arquitectura del sistema y flujo de componentes en sintaxis Mermaid.js (```mermaid graph TD ... ```). Queda estrictamente prohibido usar gráficos en texto ASCII plano.
+            """
+        elif filename == "database.md":
+            prompt_instructions = """
+            Genera el contenido completo en formato Markdown para 'database.md' (Modelo y Esquema de Base de Datos).
+            Debe incluir:
+            1. Diseño Conceptual del Modelo de Datos.
+            2. DIAGRAMA MERMAID OBLIGATORIO: Diagrama ER completo en sintaxis Mermaid.js (```mermaid erDiagram ... ```).
+            3. Listado de Entidades principales con sus atributos (tipos de datos) y relaciones.
+            4. Esquema físico completo escrito en sintaxis Prisma DSL (un bloque de código schema.prisma listo para copiar).
+            5. Índices, restricciones y consideraciones de rendimiento.
+            """
+        elif filename == "api.md":
+            prompt_instructions = """
+            Genera el contenido completo en formato Markdown para 'api.md' (Especificación de APIs REST).
+            Debe incluir:
+            1. Protocolo de Comunicación, Autenticación y Manejo de Sesiones.
+            2. DIAGRAMA MERMAID OBLIGATORIO: Diagrama de secuencia del flujo de peticiones/respuestas en sintaxis Mermaid.js (```mermaid sequenceDiagram ... ```).
+            3. Listado de Endpoints clave (Rutas, Métodos HTTP, Payloads de petición y respuesta esperados).
+            4. Estructura de errores comunes.
+            """
+        elif filename == "openapi.json":
+            prompt_instructions = """
+            Genera una especificación OpenAPI 3.0 completa en formato JSON para el proyecto.
+            Debe describir todos los endpoints clave (autenticación, recursos principales del dominio).
+            Asegúrate de devolver ÚNICAMENTE código JSON válido.
+            """
+        elif filename == "backend.md":
             prompt_instructions = """
             Genera una especificación técnica completa, exhaustiva y estructurada para 'backend.md' (Lógica de Backend y Arquitectura de Servicios).
             Debe incluir obligatoriamente:
@@ -1434,7 +1236,7 @@ def export_specs(req: SaveProjectRequest, x_gemini_key: Optional[str] = Header(N
             2. Servicios Core y Reglas de Negocio del Backend para esta aplicación.
             3. Estrategia de Persistencia, Transacciones de Base de Datos y Caché.
             4. Manejo de Excepciones Centralizado y Estándares de Logging.
-            5. DIAGRAMA MERMAID OBLIGATORIO: Incluye un diagrama de flujo de procesamiento del backend o secuencia de peticiones en sintaxis Mermaid.js (```mermaid graph TD o sequenceDiagram ... ```).
+            5. DIAGRAMA MERMAID OBLIGATORIO: Diagrama de flujo de procesamiento del backend o secuencia en sintaxis Mermaid.js (```mermaid graph TD o sequenceDiagram ... ```).
             """
         elif filename == "integrations.md":
             prompt_instructions = """
@@ -1453,7 +1255,7 @@ def export_specs(req: SaveProjectRequest, x_gemini_key: Optional[str] = Header(N
             2. Manejo de Estado (Global vs Local, Estrategia de Caché/Re-fetch).
             3. Sistema de Diseño (Variables CSS, Tipografía, Paleta de colores HSL, Componentes Base).
             4. Experiencia de Usuario (UX), Animaciones, Microinteracciones y Accesibilidad (WCAG 2.1 AA).
-            5. DIAGRAMA MERMAID OBLIGATORIO: Incluye un mapa de flujo de navegación entre pantallas en sintaxis Mermaid.js (```mermaid graph LR ... ```).
+            5. DIAGRAMA MERMAID OBLIGATORIO: Mapa de flujo de navegación entre pantallas en sintaxis Mermaid.js (```mermaid graph LR ... ```).
             """
         elif filename == "security.md":
             prompt_instructions = """
@@ -1503,6 +1305,16 @@ def export_specs(req: SaveProjectRequest, x_gemini_key: Optional[str] = Header(N
             Debe incluir obligatoriamente:
             1. Al menos 3 Registros ADR completos (ADR-01, ADR-02, ADR-03) con formato: Título, Estatus (Aceptado), Contexto, Decisión Tomada y Consecuencias Técnicas.
             """
+        elif filename == "glossary.md":
+            prompt_instructions = """
+            Genera el glosario de términos del dominio en 'glossary.md'.
+            Debe incluir: Glosario de términos del proyecto y tabla de traducción Español-Inglés para variables de código, BD y APIs.
+            """
+        elif filename == "agents.md":
+            prompt_instructions = """
+            Genera las instrucciones para Agentes de Código de IA en 'agents.md'.
+            Debe incluir: Contexto del proyecto, reglas técnicas críticas, estilos de codificación y declaración de SSOT en la carpeta /specs.
+            """
         elif filename == "project.md":
             prompt_instructions = """
             Genera el resumen ejecutivo del proyecto en 'project.md'.
@@ -1523,16 +1335,20 @@ def export_specs(req: SaveProjectRequest, x_gemini_key: Optional[str] = Header(N
             Conversación y contexto relevante:
             {chat_history_summary}
             
-            Devuelve ÚNICAMENTE el contenido Markdown listo para ser guardado. Queda prohibido devolver respuestas de 5 líneas o plantillas vacías. Genera documentación técnica detallada e integral. No uses bloques ```markdown para envolver el archivo.
+            Devuelve ÚNICAMENTE el contenido listo para ser guardado. Queda prohibido devolver respuestas de 5 líneas o plantillas vacías. Genera documentación técnica detallada e integral. No uses bloques ```markdown para envolver el archivo.
             """
             resp = model.generate_content(file_prompt)
             ai_content = clean_markdown(resp.text)
             if len(ai_content) > 100:
                 save_single_spec(filename, ai_content)
             else:
-                logger.warning(f"Respuesta de IA para {filename} muy corta, reintentando...")
+                logger.warning(f"Respuesta de IA para {filename} muy corta, guardando de todas formas.")
+                save_single_spec(filename, ai_content)
         except Exception as gen_err:
             logger.error(f"Error generando {filename} con IA en export_specs: {str(gen_err)}")
+            
+    GENERATION_STATUS["is_generating"] = False
+    GENERATION_STATUS["percent"] = 100
             
     # Guardar el proyecto con los specModules cargados en project.json
     try:
