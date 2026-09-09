@@ -1036,6 +1036,40 @@ def clean_markdown(text: str) -> str:
         text = "\n".join(lines).strip()
     return text
 
+def get_local_project_docs_summary() -> str:
+    """Escanea el directorio del proyecto en busca de documentos locales (.txt, .md, .doc, docs/) para enriquecer el contexto de la IA."""
+    project_dir = get_target_project_path()
+    if not os.path.exists(project_dir):
+        return ""
+    
+    docs_content = []
+    ignored_dirs = {".git", ".venv", "node_modules", "specs", "__pycache__", "dist", "build"}
+    ignored_files = {"chat_history.json", "project.json", ".active_project.json", ".recent_projects.json"}
+    
+    try:
+        for root, dirs, files in os.walk(project_dir):
+            dirs[:] = [d for d in dirs if d not in ignored_dirs]
+            for file in files:
+                if file in ignored_files or file.startswith("."):
+                    continue
+                if file.endswith((".md", ".txt", ".json", ".rst", ".yaml", ".yml")):
+                    rel_path = os.path.relpath(os.path.join(root, file), project_dir)
+                    full_path = os.path.join(root, file)
+                    if os.path.getsize(full_path) < 100000:
+                        try:
+                            with open(full_path, "r", encoding="utf-8", errors="ignore") as f:
+                                text = f.read(2000)
+                                if text.strip():
+                                    docs_content.append(f"--- Documento local ({rel_path}) ---\n{text}")
+                        except Exception:
+                            pass
+    except Exception as e:
+        logger.error(f"Error escaneando documentos del proyecto: {str(e)}")
+        
+    if docs_content:
+        return "\n\nDOCUMENTOS LOCALES ENCONTRADOS EN EL PROYECTO:\n" + "\n".join(docs_content[:5])
+    return ""
+
 @app.post("/api/export-specs")
 def export_specs(req: SaveProjectRequest, x_gemini_key: Optional[str] = Header(None), x_gemini_fallback_key: Optional[str] = Header(None), x_gemini_model: Optional[str] = Header(None)):
     global GENERATION_STATUS
@@ -1053,7 +1087,7 @@ def export_specs(req: SaveProjectRequest, x_gemini_key: Optional[str] = Header(N
         
     force_regenerate = getattr(req, "force_regenerate", False)
 
-    # Cargar historial de chat si existe para enriquecer el contexto de la IA
+    # Cargar historial de chat y documentos locales si existen para enriquecer el contexto de la IA
     chat_history_summary = ""
     history_file = os.path.join(get_target_project_path(), "chat_history.json")
     if os.path.exists(history_file):
@@ -1068,6 +1102,10 @@ def export_specs(req: SaveProjectRequest, x_gemini_key: Optional[str] = Header(N
                 chat_history_summary = "\n".join(chat_summary_items)
         except Exception as err:
             logger.error(f"Error leyendo chat_history.json en export_specs: {str(err)}")
+            
+    local_docs_summary = get_local_project_docs_summary()
+    if local_docs_summary:
+        chat_history_summary += f"\n\n{local_docs_summary}"
             
     answers = project.get("answers", {})
     metadata = project.get("metadata", {})
