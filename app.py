@@ -1040,15 +1040,17 @@ def clean_markdown(text: str) -> str:
     return text
 
 def get_local_project_docs_summary() -> str:
-    """Escanea el directorio del proyecto en busca de documentos locales (.txt, .md, .doc, docs/) para enriquecer el contexto de la IA."""
+    """Escanea el directorio del proyecto en busca de documentos (.md, .txt, .json) y código fuente generado (.html, .css, .js, .py, etc.) para enriquecer el contexto de la IA."""
     project_dir = get_target_project_path()
     if not os.path.exists(project_dir):
         return ""
     
     docs_content = []
-    ignored_dirs = {".git", ".venv", "node_modules", "specs", "__pycache__", "dist", "build"}
-    ignored_files = {"chat_history.json", "project.json", ".active_project.json", ".recent_projects.json"}
-    valid_exts = (".md", ".txt", ".json", ".rst", ".yaml", ".yml")
+    code_content = []
+    ignored_dirs = {".git", ".venv", "node_modules", "specs", "__pycache__", "dist", "build", ".cache"}
+    ignored_files = {"chat_history.json", "project.json", ".active_project.json", ".recent_projects.json", "package-lock.json"}
+    doc_exts = (".md", ".txt", ".json", ".rst", ".yaml", ".yml")
+    code_exts = (".html", ".css", ".js", ".jsx", ".ts", ".tsx", ".py", ".vue", ".svelte", ".sql", ".go", ".php")
     
     try:
         for root, dirs, files in os.walk(project_dir):
@@ -1056,23 +1058,34 @@ def get_local_project_docs_summary() -> str:
             for file in files:
                 if file in ignored_files or file.startswith("."):
                     continue
-                if file.lower().endswith(valid_exts):
-                    rel_path = os.path.relpath(os.path.join(root, file), project_dir)
-                    full_path = os.path.join(root, file)
-                    if os.path.getsize(full_path) < 200000:
-                        try:
+                file_lower = file.lower()
+                rel_path = os.path.relpath(os.path.join(root, file), project_dir)
+                full_path = os.path.join(root, file)
+                
+                if os.path.getsize(full_path) < 200000:
+                    try:
+                        if file_lower.endswith(doc_exts):
                             with open(full_path, "r", encoding="utf-8", errors="ignore") as f:
                                 text = f.read(4000)
                                 if text.strip():
-                                    docs_content.append(f"--- Documento local ({rel_path}) ---\n{text}")
-                        except Exception:
-                            pass
+                                    docs_content.append(f"--- Documento ({rel_path}) ---\n{text}")
+                        elif file_lower.endswith(code_exts):
+                            with open(full_path, "r", encoding="utf-8", errors="ignore") as f:
+                                text = f.read(3000)
+                                if text.strip():
+                                    code_content.append(f"--- Código Fuente Generado ({rel_path}) ---\n{text}")
+                    except Exception:
+                        pass
     except Exception as e:
-        logger.error(f"Error escaneando documentos del proyecto: {str(e)}")
+        logger.error(f"Error escaneando documentos y código del proyecto: {str(e)}")
         
+    summary_parts = []
     if docs_content:
-        return "\n\nDOCUMENTOS LOCALES ENCONTRADOS EN EL PROYECTO:\n" + "\n".join(docs_content[:5])
-    return ""
+        summary_parts.append("DOCUMENTOS Y REFERENCIAS DEL PROYECTO:\n" + "\n".join(docs_content[:5]))
+    if code_content:
+        summary_parts.append("CÓDIGO FUENTE IMPLEMENTADO EN EL PROYECTO (Generado por OpenCode/Devs):\n" + "\n".join(code_content[:6]))
+        
+    return "\n\n".join(summary_parts)
 
 @app.post("/api/export-specs")
 def export_specs(req: SaveProjectRequest, x_gemini_key: Optional[str] = Header(None), x_gemini_fallback_key: Optional[str] = Header(None), x_gemini_model: Optional[str] = Header(None)):
